@@ -58,7 +58,7 @@
       version: 1,
       empresa: { nombre: 'CIVIZO', lema: 'Servicios Alimentarios', responsable: '', telefono: '', correo: '', ciudad: 'Monterrey, N.L.' },
       parametros: { iva: 16, margen: 35, foodCost: 30, indirectos: 8, diasVigencia: 30, anticipoPct: 50, diasAnticipo: 15, diasSaldo: 3 },
-      insumos: [], recetas: [], servicios: [], eventos: [], solicitudes: [], proveedores: []
+      insumos: [], recetas: [], servicios: [], eventos: [], solicitudes: [], proveedores: [], movimientos: []
     };
   }
 
@@ -69,7 +69,7 @@
     const out = Object.assign(b, d);
     out.empresa = Object.assign(vacio().empresa, d.empresa || {});
     out.parametros = Object.assign(vacio().parametros, d.parametros || {});
-    ['insumos', 'recetas', 'servicios', 'eventos', 'solicitudes', 'proveedores'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+    ['insumos', 'recetas', 'servicios', 'eventos', 'solicitudes', 'proveedores', 'movimientos'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
     out.insumos.forEach(i => { if (!Array.isArray(i.cotizaciones)) i.cotizaciones = []; if (!Array.isArray(i.historial)) i.historial = []; });
     out.recetas.forEach(r => { r.ingredientes = r.ingredientes || []; r.alergenos = r.alergenos || []; });
     out.servicios.forEach(s => { s.componentes = s.componentes || []; });
@@ -239,6 +239,11 @@
     prov('Soriana', { tipo: 'Supermercado' });
     prov('Carnes del Norte', { tipo: 'Distribuidor', contacto: 'Contacto de ejemplo', pago: 'Crédito', diasCredito: 15, pedidoMinimo: 2000, entrega: 'Mar y vie antes de las 9:00' });
     prov('Desechables MTY', { tipo: 'Distribuidor', pedidoMinimo: 800, entrega: 'Entrega al día siguiente' });
+    // Inventario de ejemplo: entradas iniciales y mínimos
+    const mov = (clave, cantidadBase, nota) => d.movimientos.push({ id: 'mov-' + clave, insumoId: I[clave], tipo: 'entrada', cantidad: cantidadBase, fecha: t.slice(0, 10), nota: nota || 'Inventario inicial de ejemplo', creado: t, actualizado: t, ejemplo: true });
+    mov('arroz', 10000); mov('aceite', 6000); mov('pollo', 4000); mov('frijol', 3000); mov('azucar', 5000); mov('vaso', 100); mov('servilleta', 1000); mov('plato', 50);
+    const minimo = (clave, cant, u) => { const x = d.insumos.find(i => i.id === I[clave]); x.inventario = { minimo: cant, minimoUnidad: u, ubicacion: '' }; };
+    minimo('arroz', 5, 'kg'); minimo('aceite', 3, 'l'); minimo('pollo', 10, 'kg'); minimo('vaso', 200, 'pza'); minimo('servilleta', 500, 'pza');
     const hoy = new Date();
     const en = dias => { const f = new Date(hoy.getTime() + dias * 864e5); f.setMinutes(f.getMinutes() - f.getTimezoneOffset()); return f.toISOString().slice(0, 10); };
     d.eventos.push({
@@ -257,10 +262,10 @@
 
   /** Quita todo lo marcado como ejemplo (y lo que dependa de ello queda con aviso). */
   function quitarEjemplos(d) {
-    ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { d[k] = d[k].filter(x => !x.ejemplo); });
+    ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores', 'movimientos'].forEach(k => { d[k] = d[k].filter(x => !x.ejemplo); });
     return d;
   }
-  function hayEjemplos(d) { return ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].some(k => d[k].some(x => x.ejemplo)); }
+  function hayEjemplos(d) { return ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores', 'movimientos'].some(k => d[k].some(x => x.ejemplo)); }
 
   const API = { CLAVE, LINEAS, CATEGORIAS_INSUMO, CATEGORIAS_RECETA, ALERGENOS, ESTATUS, uid, ahora, vacio, normalizar, cargar, guardar, siguienteCodigoReceta, siguienteFolio, ejemplo, quitarEjemplos, hayEjemplos };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;

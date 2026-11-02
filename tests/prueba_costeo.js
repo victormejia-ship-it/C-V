@@ -173,4 +173,16 @@ prueba('importe con letra para recibos', () => {
   assert.strictEqual(C.numeroALetras(2500000), 'Dos millones quinientos mil pesos 00/100 M.N.');
 });
 
+prueba('inventario: existencia por movimientos y compras que restan existencia', () => {
+  const movs = [{ insumoId: 'a', cantidad: C.cantidadConSigno('entrada', 5000) }, { insumoId: 'a', cantidad: C.cantidadConSigno('salida', 1200) }, { insumoId: 'a', cantidad: C.cantidadConSigno('ajuste', -300) }, { insumoId: 'b', cantidad: C.cantidadConSigno('merma', 40) }];
+  const st = C.existencias(movs);
+  cerca(st.get('a'), 3500); cerca(st.get('b'), -40);
+  const lista = [{ id: 'a', brutaBase: 6000, presentacion: 1, unidadCompra: 'kg', precio: 30 }, { id: 'c', brutaBase: 100, presentacion: 50, unidadCompra: 'pza', precio: 90 }, { id: 'd', brutaBase: 800, presentacion: 1, unidadCompra: 'kg', precio: 20 }];
+  const st2 = new Map([['a', 3500], ['d', 1000]]);
+  const r = C.comprasMenosExistencia(lista, st2);
+  cerca(r[0].brutaBase, 2500); assert.strictEqual(r[0].empaquesCompra, 3); cerca(r[0].costoCompra, 90);
+  assert.strictEqual(r[1].empaquesCompra, 2); cerca(r[1].costoCompra, 180);
+  assert.strictEqual(r[2].cubierto, true); assert.strictEqual(r[2].empaquesCompra, 0);
+});
+
 console.log('\n' + ok + ' pruebas correctas');

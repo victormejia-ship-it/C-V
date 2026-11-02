@@ -94,6 +94,7 @@
     escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>',
     externo: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    menos: '<path d="M5 12h14"/>',
     chat: '<path d="M4 20l1.3-4A8 8 0 1 1 8 19l-4 1z"/>',
     telefono: '<path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
     cobranza: '<path d="M6 6V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><path d="M15.5 15h2.5"/>',
@@ -270,7 +271,7 @@
     const c = capaActual();
     if (!c || !c.classList.contains('capa')) return pintar('reemplazo');
     const ruta = c.dataset.ruta, r = rutaDe(ruta);
-    const vistas = { proveedores: vProveedores, proveedor: vProveedor, comparar: vComparar, cobranza: vCobranza, cobro: vCobro, sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
+    const vistas = { inventario: vInventario, movimientos: vMovimientos, conteo: vConteo, proveedores: vProveedores, proveedor: vProveedor, comparar: vComparar, cobranza: vCobranza, cobro: vCobro, sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
     if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; delete vistas.sitio; }
     if (!NUBE) delete vistas.usuarios;
     ctx = { obj: null, recalcular: null, acciones: {} };
@@ -446,6 +447,8 @@
         if (fc > obj) alertas.push(['alerta', esc(r.nombre) + ': food cost de ' + pct(fc) + ' (objetivo ' + pct(obj) + ')', '#receta-' + r.id, 'Ver']);
       }
     });
+    const reponer = porReponer().length;
+    if (reponer) alertas.push(['alerta', reponer + ' insumo' + (reponer > 1 ? 's' : '') + ' bajo el mínimo de inventario', '#inventario', 'Ver']);
     db.eventos.filter(e => enCobranza(e) && e.estatus !== 'cancelada').forEach(e => { const k = cobDe(e); if (k.estado === 'vencido') alertas.push(['error', esc(e.nombre || e.folio) + ': ' + dinero(k.vencido) + ' vencido', '#cobro-' + e.id, 'Cobrar']); });
     db.eventos.filter(e => e.estatus === 'aprobada' && diasHasta(e.fecha) < 0).forEach(e => alertas.push(['info', esc(e.nombre) + ' ya pasó; márcalo como realizado', '#evento-' + e.id, 'Abrir']));
 
@@ -708,6 +711,7 @@
       $('costoCompra').textContent = dinero(C.costoBaseCompra(ins) * factorBase(C.dimension(ins.unidadCompra)));
       $('costoNeto').textContent = dinero(C.costoBaseNeto(ins) * factorBase(C.dimension(ins.unidadCompra)));
       $('edadPrecio').innerHTML = pillEdad(ins);
+      if ($('invPill')) $('invPill').innerHTML = pillInv(estadoInv(ins, stock()));
       actualizarTitulo(ins.nombre || 'Insumo');
     };
     ctx.acciones = {
@@ -726,6 +730,7 @@
       usarCot: d => { const q = ins.cotizaciones.find(c => c.id === d.cid); if (!q) return; registrarPrecio(ins, { precio: q.precio, presentacion: q.presentacion, unidadCompra: q.unidad }, q.fuente); if (q.enlace) ins.enlace = q.enlace; cambioEstructura(); render(); aviso('Precio de costeo: ' + q.fuente); },
       quitarCot: d => { ins.cotizaciones = ins.cotizaciones.filter(c => c.id !== d.cid); guardar(true); render(); },
       confirmarPrecio: () => { registrarPrecio(ins, ins, ins.proveedor); guardar(true); render(); aviso('Precio confirmado hoy'); },
+      movRapido: d => abrirMovimiento(d.id, d.tipo),
       eliminar: () => {
         if (usado) return abrirModal({ titulo: 'No se puede eliminar', compacto: true, cuerpo: '<p>Este insumo se usa en:</p><ul>' + usos.recetas.map(r => '<li>Receta: ' + esc(r.nombre) + '</li>').join('') + usos.servicios.map(s => '<li>Servicio: ' + esc(s.nombre) + '</li>').join('') + '</ul>', botones: [{ texto: 'Entendido', clase: 'primario' }] });
         confirmar('Eliminar insumo', '¿Eliminar <b>' + esc(ins.nombre) + '</b>?', 'Eliminar', () => { db.insumos = db.insumos.filter(x => x.id !== ins.id); cambioEstructura(); atras(); aviso('Insumo eliminado'); });
@@ -752,6 +757,7 @@
       + '<p class="tenue ancho" id="q-calc" aria-live="polite"></p>'
       + '<label class="check"><input type="checkbox" id="q-usar"' + (C.num(ins.precio) > 0 ? '' : ' checked') + '> Usar como precio de costeo</label>'
       + '<div class="acciones"><button class="btn primario" data-accion="agregarCot">' + ico('mas') + 'Guardar cotización</button></div></div></section>'
+      + panelInventarioInsumo(ins)
       + '<section class="panel"><h2>Datos</h2><div class="campos">' + campoTexto('Nombre', 'nombre', ins.nombre, { ancho: true })
       + '<label class="campo"><span>Categoría</span><input type="text" id="f-categoria" data-campo="categoria" list="dl-cats" value="' + esc(ins.categoria) + '" autocomplete="off"><datalist id="dl-cats">' + cats.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></label></div></section>'
       + '</div><aside class="pegajoso rejilla"><section class="panel"><h2>Historial del costo</h2>' + grafica(ins.historial) + (hist ? '<div class="resumen">' + hist + '</div>' : '<p class="tenue">Cada cambio de precio queda registrado aquí con su fecha y su fuente.</p>') + '</section>'
@@ -1287,6 +1293,20 @@
       quitar: d => { e[d.lista].splice(+d.i, 1); guardar(); render(); },
       cotizacion: () => imprimir(docCotizacionCliente(e)),
       irCobro: () => abrir('cobro-' + e.id),
+      descontarInv: () => {
+        const lista = C.listaCompras(C.explotarEvento(e, IX), IX);
+        if (!lista.length) return aviso('El evento no tiene insumos que descontar', true);
+        const st = stock(), faltan = lista.filter(f => (st.get(f.id) || 0) < f.brutaBase - 1e-6).length;
+        confirmar('Descontar del inventario', 'Se registrará la salida de <b>' + lista.length + ' insumos</b> que usa este evento (cantidades con merma).' + (faltan ? ' <b>' + faltan + '</b> no tienen existencia suficiente y quedarán en negativo.' : ''), 'Descontar', () => {
+          lista.forEach(f => { const ins = IX.insumos.get(f.id); if (ins) registrarMovimiento(ins, 'salida', f.brutaBase, { nota: 'Evento ' + (e.folio || e.nombre), eventoId: e.id }); });
+          e.inventarioDescontado = D.ahora(); guardar(true); render(); aviso(lista.length + ' insumos descontados del inventario');
+        });
+      },
+      devolverInv: () => confirmar('Devolver al inventario', 'Se eliminarán las salidas que este evento registró en el inventario.', 'Devolver', () => {
+        const n = db.movimientos.filter(m => m.eventoId === e.id && m.tipo === 'salida').length;
+        db.movimientos = db.movimientos.filter(m => !(m.eventoId === e.id && m.tipo === 'salida'));
+        delete e.inventarioDescontado; e.actualizado = D.ahora(); guardar(true); render(); aviso(n + ' salidas revertidas');
+      }),
       costoInterno: () => imprimir(docCostoInterno(e)),
       produccion: () => modalCompras('Producción y compras · ' + (e.nombre || e.folio) + ' · ' + n0(e.personas) + ' personas', C.explotarEvento(e, IX), e.nombre || e.folio, e),
       duplicar: () => { const n = copia(e); n.id = 'evt-' + D.uid(); n.folio = D.siguienteFolio(db); n.nombre = (e.nombre || 'Evento') + ' (copia)'; n.estatus = 'borrador'; delete n.ejemplo; n.creado = n.actualizado = D.ahora(); db.eventos.push(n); cambioEstructura(); aviso('Evento duplicado como borrador'); reemplazar('evento-' + n.id); },
@@ -1294,7 +1314,7 @@
     };
 
     return '<div class="cabecera"><div><span class="ceja">Evento · ' + esc(e.folio) + '</span><h1>' + esc(e.nombre || 'Nuevo evento') + '</h1></div>'
-      + '<div class="acciones"><button class="btn primario" data-accion="cotizacion">' + ico('facturacion') + 'Cotización cliente</button><button class="btn" data-accion="costoInterno">' + ico('imprimir') + 'Costo interno</button><button class="btn" data-accion="produccion">' + ico('lista') + 'Producción y compras</button><button class="btn" data-accion="irCobro">' + ico('cobranza') + 'Cobranza</button><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro fantasma" data-accion="eliminar" aria-label="Eliminar evento">' + ico('borrar') + '</button></div></div>'
+      + '<div class="acciones"><button class="btn primario" data-accion="cotizacion">' + ico('facturacion') + 'Cotización cliente</button><button class="btn" data-accion="costoInterno">' + ico('imprimir') + 'Costo interno</button><button class="btn" data-accion="produccion">' + ico('lista') + 'Producción y compras</button><button class="btn" data-accion="irCobro">' + ico('cobranza') + 'Cobranza</button>' + (e.inventarioDescontado ? '<button class="btn" data-accion="devolverInv">' + ico('inventario') + 'Devolver al inventario</button>' : '<button class="btn" data-accion="descontarInv">' + ico('inventario') + 'Descontar del inventario</button>') + '<button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro fantasma" data-accion="eliminar" aria-label="Eliminar evento">' + ico('borrar') + '</button></div></div>'
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<section class="panel"><h2>Datos del evento</h2><div class="campos">'
       + campoTexto('Nombre del evento', 'nombre', e.nombre, { ancho: true, ph: 'Ej. Boda García–López, Capacitación anual' })
@@ -1392,6 +1412,7 @@
       ico2('recetas', 'recetas', 'Recetas', conError || ''),
       btnIco('abrirEscalador', 'escalar', 'Escalar'),
       ico2('compras', 'compras', 'Compras', porSurtir || ''),
+      ico2('inventario', 'inventario', 'Inventario', porReponer().length || ''),
       ico2('proveedores', 'proveedores', 'Proveedores', fuentesUsadas().filter(f => !provPorNombre(f)).length ? '+' : ''),
       ico2('insumos', 'insumos', 'Insumos', db.insumos.filter(vencido).length || ''),
       ico2('tablero', 'tablero', 'Tablero')
@@ -1417,7 +1438,6 @@
       + '<h1>' + saludoHora() + (nombre ? ', <b>' + esc(nombre.split(' ')[0]) + '</b>' : '') + '</h1>'
       + '<div class="resumen-dia">' + resumen.map(t => '<span><i></i>' + t + '</span>').join('') + '</div></div>'
       + '<nav class="iconos" aria-label="Funciones">' + iconos.join('') + '</nav>'
-      + '<div class="separador">Próximamente</div><div class="iconos">' + prox('inventario', 'Inventario') + '</div>'
       + (D.hayEjemplos(db) && puedeEditar() ? '<div class="aviso-ejemplo"><span>Estás usando datos de ejemplo.</span><button class="btn chico" data-accion="quitarEjemplos">Borrarlos</button></div>' : '')
       + '</div>'
       + (puedeEditar() ? '<button type="button" class="fab" data-accion="crear" aria-label="Crear" title="Crear">' + ico('mas') + '</button>' : '');
@@ -1513,7 +1533,11 @@
     const elegidos = eventos.filter(x => !e.fuera.includes(x.id));
     const acc = C.nuevoAcumulado();
     elegidos.forEach(x => C.explotarEvento(x, IX, acc));
-    const lista = C.listaCompras(acc, IX);
+    if (e.usarInv == null) e.usarInv = db.movimientos.length > 0;
+    const listaBase = C.listaCompras(acc, IX);
+    const ajustada = e.usarInv ? C.comprasMenosExistencia(listaBase, stock()) : listaBase;
+    const cubiertos = e.usarInv ? ajustada.filter(f => f.cubierto).length : 0;
+    const lista = e.usarInv ? ajustada.filter(f => !f.cubierto) : listaBase;
     const preps = prepsDe(acc);
     const total = lista.reduce((s, f) => s + f.costoCompra, 0);
     const pax = elegidos.reduce((s, x) => s + C.num(x.personas), 0);
@@ -1530,6 +1554,7 @@
     ctx.alPintar = () => {
       $('cDesde').addEventListener('change', ev => { e.desde = ev.target.value; render(); });
       $('cHasta').addEventListener('change', ev => { e.hasta = ev.target.value; render(); });
+      $('cInv').addEventListener('change', ev => { e.usarInv = ev.target.checked; render(); });
       capaActual().querySelectorAll('[data-est]').forEach(ch => ch.addEventListener('change', () => { e.est = Array.from(capaActual().querySelectorAll('[data-est]:checked')).map(x => x.value); render(); }));
     };
     return '<div class="cabecera"><div><span class="ceja">Cocina y producción</span><h1>Producción y compras</h1><p class="sub">Junta todo lo que hay que preparar y comprar para los eventos de un periodo. Cada receta y sub-receta se escala y se suma con su merma.</p></div>'
@@ -1537,8 +1562,9 @@
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<div class="metricas"><div class="metrica destacada"><span class="et">Compra estimada</span><span class="val">' + dinero(total) + '</span><span class="det">empaques completos</span></div><div class="metrica"><span class="et">Eventos</span><span class="val">' + elegidos.length + '</span><span class="det">de ' + eventos.length + ' en el periodo</span></div><div class="metrica"><span class="et">Personas</span><span class="val">' + n0(pax) + '</span><span class="det">a atender</span></div><div class="metrica"><span class="et">Insumos</span><span class="val">' + lista.length + '</span><span class="det">' + preps.length + ' preparaciones</span></div></div>'
       + '<section class="panel"><h2>Preparaciones</h2>' + (preps.length ? '<div class="tabla-env"><table><thead><tr><th>Receta</th><th class="num">Porciones</th><th class="num">Volumen</th><th class="num">Factor</th></tr></thead><tbody>' + preps.map(p => { const rb = C.rendimientoBase(p.r); return '<tr class="clic" tabindex="0" data-ir="#receta-' + p.r.id + '"><td>' + esc(p.r.nombre) + (p.base ? ' <span class="pill">base</span>' : '') + '</td><td class="num"><b>' + C.fmtCant(p.porc) + '</b></td><td class="num">' + (rb ? C.fmtLegible(rb.base * p.porc / C.porcionesReceta(p.r), rb.dim) : '—') + '</td><td class="num">×' + C.fmtCant(p.porc / C.porcionesReceta(p.r)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="tenue">Nada que preparar con los eventos elegidos.</p>') + '</section>'
-      + '<section class="panel"><h2>Lista de compras</h2>' + (lista.length ? Object.keys(porCat).map(cat => '<h3 class="ceja" style="margin-top:6px">' + esc(cat) + '</h3><div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Bruto a surtir</th><th class="num">Comprar</th><th>Proveedor</th><th class="num">Costo</th></tr></thead><tbody>' + porCat[cat].map(f => '<tr><td>' + esc(f.nombre) + '</td><td class="num"><b>' + C.fmtLegible(f.brutaBase, f.dim) + '</b></td><td class="num">' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + esc(C.nombreUnidad(f.unidadCompra)) + '</td><td>' + esc(f.proveedor || '—') + '</td><td class="num">' + dinero(f.costoCompra) + '</td></tr>').join('') + '</tbody></table></div>').join('') : '<div class="vacio"><p>No hay insumos por comprar. Ajusta las fechas o los estatus para incluir eventos.</p></div>') + '</section></div>'
+      + '<section class="panel"><h2>Lista de compras</h2>' + (lista.length ? Object.keys(porCat).map(cat => '<h3 class="ceja" style="margin-top:6px">' + esc(cat) + '</h3><div class="tabla-env"><table><thead><tr><th>Insumo</th>' + (e.usarInv ? '<th class="num">Requerido</th><th class="num">En inventario</th><th class="num">Falta</th>' : '<th class="num">Bruto a surtir</th>') + '<th class="num">Comprar</th><th>Proveedor</th><th class="num">Costo</th></tr></thead><tbody>' + porCat[cat].map(f => '<tr><td>' + esc(f.nombre) + '</td>' + (e.usarInv ? '<td class="num">' + C.fmtLegible(f.requeridoBase, f.dim) + '</td><td class="num">' + C.fmtLegible(f.existenciaBase, f.dim) + '</td>' : '') + '<td class="num"><b>' + C.fmtLegible(f.brutaBase, f.dim) + '</b></td><td class="num">' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + esc(C.nombreUnidad(f.unidadCompra)) + '</td><td>' + esc(f.proveedor || '—') + '</td><td class="num">' + dinero(f.costoCompra) + '</td></tr>').join('') + '</tbody></table></div>').join('') : '<div class="vacio"><p>No hay insumos por comprar. Ajusta las fechas o los estatus para incluir eventos.</p></div>') + '</section></div>'
       + '<aside class="pegajoso"><section class="panel" data-libre><h2>Periodo y eventos</h2><div class="campos" style="grid-template-columns:repeat(2,minmax(0,1fr))"><label class="campo"><span>Desde</span><input type="date" id="cDesde" value="' + esc(e.desde) + '" data-libre></label><label class="campo"><span>Hasta</span><input type="date" id="cHasta" value="' + esc(e.hasta) + '" data-libre></label></div>'
+      + '<label class="check"><input type="checkbox" id="cInv" data-libre' + (e.usarInv ? ' checked' : '') + '> Restar lo que hay en inventario</label>' + (cubiertos ? '<p class="tenue">' + cubiertos + ' insumo' + (cubiertos === 1 ? ' ya está cubierto' : 's ya están cubiertos') + ' por el inventario.</p>' : '')
       + '<div class="campo"><span class="etq">Estatus que se incluyen</span><div class="chips-sel">' + D.ESTATUS.filter(s => s.id !== 'cancelada').map(s => '<label><input type="checkbox" data-est value="' + s.id + '"' + (e.est.includes(s.id) ? ' checked' : '') + ' data-libre>' + s.nombre + '</label>').join('') + '</div></div>'
       + (eventos.length ? '<ul class="lista-alertas">' + eventos.map(x => '<li><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-accion="alternarEvento" data-id="' + x.id + '"' + (e.fuera.includes(x.id) ? '' : ' checked') + ' data-libre><span><b>' + esc(x.nombre || x.folio) + '</b><br><span class="tenue">' + fechaCorta(x.fecha) + ' · ' + n0(x.personas) + ' personas</span></span></label>' + pillEstatus(x.estatus) + '</li>').join('') + '</ul>' : '<p class="tenue">No hay eventos con fecha en este periodo y con esos estatus.</p>')
       + '</section></aside></div>';
@@ -1600,8 +1626,8 @@
   }
 
   /* ---------------------------------------------------------- Solo lectura */
-  const ACC_LECTURA = new Set(['irComparar', 'soloComp', 'pedidosProveedor', 'filtroCobranza', 'recibo', 'estadoCuenta', 'verEvento', 'filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
-  const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
+  const ACC_LECTURA = new Set(['filtroInv', 'irConteo', 'irMovs', 'filtroMov', 'conteoTodos', 'irComparar', 'soloComp', 'pedidosProveedor', 'filtroCobranza', 'recibo', 'estadoCuenta', 'verEvento', 'filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta|cInv|fqi|fci|fqv|fcc|fqp)$/;
   function aplicarSoloLectura() {
     capaActual().querySelectorAll('input, select, textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
     capaActual().querySelectorAll('[data-accion]').forEach(el => { if (!ACC_LECTURA.has(el.dataset.accion)) el.hidden = true; });
@@ -1671,7 +1697,7 @@
     const loc = datosLocalesGuardados();
     if (!loc) return aviso('No hay información guardada en este equipo', true);
     let n = 0;
-    ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); loc[k].forEach(x => { if (!ids.has(x.id)) { db[k].push(x); n++; } }); });
+    ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores', 'movimientos'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); loc[k].forEach(x => { if (!ids.has(x.id)) { db[k].push(x); n++; } }); });
     if (!db.insumos.length && !n) return aviso('No hay nada nuevo que subir');
     if (loc.empresa && !db.empresa.telefono && !db.empresa.correo) Object.assign(db.empresa, loc.empresa);
     cambioEstructura(); render();
@@ -1686,7 +1712,7 @@
         + (cuantos ? '<div class="nota acento">Este navegador tiene <b>' + cuantos + ' elementos</b> capturados en modo local. Puedes subirlos a la nube ahora.</div>' : '<p>La nube está vacía. Puedes empezar a capturar o cargar los datos de ejemplo.</p>'),
       botones: cuantos
         ? [{ texto: 'Después', clase: 'fantasma' }, { texto: 'Subir lo de este equipo', clase: 'primario', accion: () => subirDatosLocales() }]
-        : [{ texto: 'Empezar vacío', clase: 'fantasma' }, { texto: 'Cargar datos de ejemplo', clase: 'primario', accion: () => { const ej = D.ejemplo(); ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { db[k] = db[k].concat(ej[k]); }); cambioEstructura(); render(); } }]
+        : [{ texto: 'Empezar vacío', clase: 'fantasma' }, { texto: 'Cargar datos de ejemplo', clase: 'primario', accion: () => { const ej = D.ejemplo(); ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores', 'movimientos'].forEach(k => { db[k] = db[k].concat(ej[k]); }); cambioEstructura(); render(); } }]
     });
   }
   let pendienteRemoto = false, sondeando = false, tSondeo = null;
@@ -1727,6 +1753,172 @@
     });
     if (!N.sesion()) return pantallaAcceso();
     entrarConSesion();
+  }
+
+  /* ================================================================ INVENTARIO
+     Cada entrada, salida, merma o ajuste es un movimiento (colección propia);
+     la existencia es la suma. Así dos equipos pueden registrar al mismo tiempo
+     sin pisarse. Las cantidades se guardan en unidad base (g, ml, pza). */
+  const TIPOS_MOV = { entrada: ['Entrada', 'ok'], salida: ['Salida', ''], merma: ['Merma', 'error'], ajuste: ['Ajuste por conteo', 'info'] };
+  const stock = () => C.existencias(db.movimientos);
+  const minimoBase = i => { const v = i.inventario || {}; return C.num(v.minimo) > 0 && v.minimoUnidad && C.dimension(v.minimoUnidad) === C.dimension(i.unidadCompra) ? C.aBase(v.minimo, v.minimoUnidad) : 0; };
+  const controlado = (i, st) => st.has(i.id) || minimoBase(i) > 0;
+  function estadoInv(i, st) { if (!controlado(i, st)) return 'sin-control'; const ex = st.get(i.id) || 0, mn = minimoBase(i); return ex <= 1e-9 ? 'agotado' : mn && ex < mn ? 'bajo' : 'ok'; }
+  const EST_INV = { ok: ['Suficiente', 'ok'], bajo: ['Bajo mínimo', 'alerta'], agotado: ['Agotado', 'error'], 'sin-control': ['Sin registro', ''] };
+  const pillInv = e => '<span class="pill ' + EST_INV[e][1] + '">' + EST_INV[e][0] + '</span>';
+  const legibleIns = (i, base) => (base < 0 ? '−' : '') + C.fmtLegible(Math.abs(base), C.dimension(i.unidadCompra));
+  const porReponer = () => { const st = stock(); return db.insumos.filter(i => ['bajo', 'agotado'].includes(estadoInv(i, st))); };
+  function registrarMovimiento(i, tipo, cantidadBase, extra) {
+    const m = Object.assign({ id: 'mov-' + D.uid(), insumoId: i.id, tipo, cantidad: Math.round(C.cantidadConSigno(tipo, cantidadBase) * 1000) / 1000, fecha: hoyISO(), creado: D.ahora(), actualizado: D.ahora(), por: (perfil && perfil.correo) || '' }, extra || {});
+    db.movimientos.push(m); return m;
+  }
+  function ultimoMov(id) { let u = null; db.movimientos.forEach(m => { if (m.insumoId === id && (!u || String(m.fecha) + String(m.creado) > String(u.fecha) + String(u.creado))) u = m; }); return u; }
+
+  function abrirMovimiento(insumoId, tipoIni) {
+    const st = stock();
+    let ins = insumoId ? IX.insumos.get(insumoId) : db.insumos.slice().sort(sortNombre)[0];
+    if (!ins) return aviso('Primero da de alta un insumo', true);
+    const opcionesIns = () => db.insumos.slice().sort(sortNombre).map(i => '<option value="' + i.id + '"' + (i.id === ins.id ? ' selected' : '') + '>' + esc(i.nombre) + '</option>').join('');
+    const unidades = i => C.unidadesDe(C.dimension(i.unidadCompra));
+    abrirModal({
+      titulo: 'Movimiento de inventario', compacto: true,
+      cuerpo: (insumoId ? '<p><b>' + esc(ins.nombre) + '</b></p>' : '<label class="campo"><span>Insumo</span><select id="mv-ins">' + opcionesIns() + '</select></label>')
+        + '<div class="chips-sel" role="radiogroup" aria-label="Tipo">' + Object.keys(TIPOS_MOV).map(t => '<label><input type="radio" name="mv-tipo" value="' + t + '"' + (t === (tipoIni || 'entrada') ? ' checked' : '') + '>' + TIPOS_MOV[t][0] + '</label>').join('') + '</div>'
+        + '<div class="campos" style="grid-template-columns:repeat(2,minmax(0,1fr))"><label class="campo"><span id="mv-etq">Cantidad</span><div class="compuesto"><input id="mv-cant" type="text" inputmode="decimal" autocomplete="off"><select id="mv-uni" aria-label="Unidad">' + opcionesUnidad(unidades(ins), ins.unidadCompra) + '</select></div></label>'
+        + '<label class="campo"><span>Fecha</span><input id="mv-fecha" type="date" value="' + hoyISO() + '"></label>'
+        + '<label class="campo ancho"><span>Referencia o nota</span><input id="mv-nota" type="text" placeholder="Pedido, evento, motivo de la merma…" autocomplete="off"></label></div>'
+        + '<p class="tenue" id="mv-calc"></p>',
+      alAbrir: c => {
+        const calc = () => {
+          const tipo = c.querySelector('[name="mv-tipo"]:checked').value, v = C.num(c.querySelector('#mv-cant').value), base = C.aBase(v, c.querySelector('#mv-uni').value) || 0;
+          const ex = st.get(ins.id) || 0;
+          c.querySelector('#mv-etq').textContent = tipo === 'ajuste' ? 'Existencia contada' : 'Cantidad';
+          const nueva = tipo === 'ajuste' ? base : ex + C.cantidadConSigno(tipo, base);
+          c.querySelector('#mv-calc').textContent = 'Existencia actual: ' + legibleIns(ins, ex) + (v > 0 || tipo === 'ajuste' ? ' → quedará ' + legibleIns(ins, nueva) : '') + (nueva < -1e-9 ? '. Ojo: quedaría en negativo.' : '');
+        };
+        const sel = c.querySelector('#mv-ins');
+        if (sel) sel.addEventListener('change', () => { ins = IX.insumos.get(sel.value); c.querySelector('#mv-uni').innerHTML = opcionesUnidad(unidades(ins), ins.unidadCompra); calc(); });
+        c.addEventListener('input', calc); c.addEventListener('change', calc); calc();
+        setTimeout(() => c.querySelector('#mv-cant').focus(), 30);
+      },
+      botones: [{ texto: 'Cancelar', clase: 'fantasma' }, {
+        texto: 'Registrar', clase: 'primario', accion: c => {
+          const tipo = c.querySelector('[name="mv-tipo"]:checked').value, v = C.num(c.querySelector('#mv-cant').value), base = C.aBase(v, c.querySelector('#mv-uni').value);
+          if (tipo !== 'ajuste' && !(v > 0)) { aviso('Escribe la cantidad', true); return false; }
+          const ex = st.get(ins.id) || 0;
+          const delta = tipo === 'ajuste' ? base - ex : base;
+          if (tipo === 'ajuste' && Math.abs(delta) < 1e-9) { aviso('La existencia ya coincide; no se registró nada'); return; }
+          registrarMovimiento(ins, tipo, delta, { fecha: c.querySelector('#mv-fecha').value || hoyISO(), nota: c.querySelector('#mv-nota').value.trim() });
+          if (tipo === 'ajuste') { ins.inventario = Object.assign({}, ins.inventario, { ultimoConteo: hoyISO() }); ins.actualizado = ins.actualizado || D.ahora(); }
+          guardar(true); render();
+          aviso('Movimiento registrado · ' + ins.nombre + ': ' + legibleIns(ins, stock().get(ins.id) || 0));
+        }
+      }]
+    });
+  }
+
+  const filtroInv = { modo: '', q: '', cat: '' };
+  function vInventario() {
+    const st = stock();
+    const filas0 = db.insumos.map(i => ({ i, ex: st.get(i.id) || 0, est: estadoInv(i, st) }));
+    const conReg = filas0.filter(f => f.est !== 'sin-control');
+    if (!filtroInv.modo) filtroInv.modo = conReg.length ? 'registro' : 'todos';
+    const m = filtroInv.modo, q = norm(filtroInv.q);
+    const vis = filas0.filter(f => (m === 'todos' || (m === 'registro' ? f.est !== 'sin-control' : m === 'bajo' ? f.est === 'bajo' : f.est === 'agotado')) && (!filtroInv.cat || (f.i.categoria || 'Otros') === filtroInv.cat) && (!q || norm(f.i.nombre).includes(q)))
+      .sort((a, b) => ({ agotado: 0, bajo: 1, ok: 2, 'sin-control': 3 }[a.est] - { agotado: 0, bajo: 1, ok: 2, 'sin-control': 3 }[b.est]) || sortNombre(a.i, b.i));
+    const valor = conReg.reduce((s, f) => s + Math.max(f.ex, 0) * C.costoBaseCompra(f.i), 0);
+    const hoy = hoyISO(), movHoy = db.movimientos.filter(x => x.fecha === hoy).length;
+    const cats = Array.from(new Set(db.insumos.map(i => i.categoria || 'Otros'))).sort((a, b) => a.localeCompare(b, 'es'));
+    const filas = vis.map(({ i, ex, est }) => {
+      const u = ultimoMov(i.id), mn = minimoBase(i);
+      return '<tr class="clic" tabindex="0" data-ir="#insumo-' + i.id + '"><td><b>' + esc(i.nombre) + '</b><br><span class="tenue">' + esc(i.categoria || 'Otros') + (i.inventario && i.inventario.ubicacion ? ' · ' + esc(i.inventario.ubicacion) : '') + '</span></td>'
+        + '<td class="num"><b>' + (est === 'sin-control' ? '—' : legibleIns(i, ex)) + '</b></td><td class="num">' + (mn ? legibleIns(i, mn) : '<span class="tenue">—</span>') + '</td>'
+        + '<td class="num">' + (est === 'sin-control' ? '—' : dinero(Math.max(ex, 0) * C.costoBaseCompra(i))) + '</td><td class="tenue">' + (u ? textoEdad(u.fecha + 'T12:00:00') : '—') + '</td><td>' + pillInv(est) + '</td>'
+        + '<td class="acc"><button class="icono-btn ir" data-accion="movRapido" data-id="' + i.id + '" data-tipo="entrada" aria-label="Entrada de ' + esc(i.nombre) + '" title="Entrada">' + ico('mas') + '</button><button class="icono-btn ir" data-accion="movRapido" data-id="' + i.id + '" data-tipo="salida" aria-label="Salida de ' + esc(i.nombre) + '" title="Salida">' + ico('menos') + '</button></td></tr>';
+    }).join('');
+    ctx.acciones = {
+      filtroInv: d => { filtroInv.modo = d.modo; render(); },
+      movRapido: d => abrirMovimiento(d.id, d.tipo),
+      nuevoMov: () => abrirMovimiento(null, 'entrada'),
+      irConteo: () => abrir('conteo'),
+      irMovs: () => abrir('movimientos')
+    };
+    ctx.alPintar = () => {
+      $('fqi').addEventListener('input', e => { filtroInv.q = e.target.value; const pos = e.target.selectionStart; render(); const n = $('fqi'); n.focus(); try { n.setSelectionRange(pos, pos); } catch (er) { /* */ } });
+      $('fci').addEventListener('change', e => { filtroInv.cat = e.target.value; render(); });
+    };
+    const nBajo = filas0.filter(f => f.est === 'bajo').length, nAgot = filas0.filter(f => f.est === 'agotado').length;
+    return '<div class="cabecera"><div><span class="ceja">Almacén</span><h1>Inventario</h1></div><div class="acciones"><button class="btn primario" data-accion="nuevoMov">' + ico('mas') + 'Registrar movimiento</button><button class="btn" data-accion="irConteo">' + ico('check') + 'Conteo físico</button><button class="btn" data-accion="irMovs">' + ico('lista') + 'Movimientos</button></div></div>'
+      + '<div class="metricas"><div class="metrica destacada"><span class="et">Valor del inventario</span><span class="val">' + dinero(valor) + '</span><span class="det">a precio de compra</span></div><div class="metrica"><span class="et">Bajo mínimo</span><span class="val">' + nBajo + '</span><span class="det">por reponer</span></div><div class="metrica"><span class="et">Agotados</span><span class="val" style="color:var(--' + (nAgot ? 'error' : 'tinta') + ')">' + nAgot + '</span><span class="det">con registro</span></div><div class="metrica"><span class="et">Movimientos hoy</span><span class="val">' + movHoy + '</span><span class="det">' + db.movimientos.length + ' en total</span></div></div>'
+      + '<div class="pestanas">' + [['registro', 'Con registro'], ['bajo', 'Bajo mínimo'], ['agotado', 'Agotados'], ['todos', 'Todos los insumos']].map(f => '<button class="' + (m === f[0] ? 'activa' : '') + '" data-accion="filtroInv" data-modo="' + f[0] + '">' + f[1] + '</button>').join('') + '</div>'
+      + '<div class="filtros"><input type="search" id="fqi" placeholder="Buscar insumo" value="' + esc(filtroInv.q) + '" aria-label="Buscar insumo"><select id="fci" aria-label="Categoría"><option value="">Todas las categorías</option>' + cats.map(c => '<option' + (c === filtroInv.cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>'
+      + (filas ? '<section class="panel"><div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Existencia</th><th class="num">Mínimo</th><th class="num">Valor</th><th>Último movimiento</th><th>Estado</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div></section>'
+        : '<div class="vacio"><h3>' + (db.movimientos.length ? 'Nada en esta lista' : 'Tu inventario está vacío') + '</h3><p>Registra lo que tienes en almacén con un conteo físico o con la primera entrada. También entra solo al recibir un pedido.</p><button class="btn primario" data-accion="irConteo">' + ico('check') + 'Hacer conteo físico</button></div>');
+  }
+
+  const filtroMov = { tipo: '' };
+  function vMovimientos() {
+    const lista = db.movimientos.filter(x => !filtroMov.tipo || x.tipo === filtroMov.tipo).slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.creado || '').localeCompare(String(a.creado || ''))).slice(0, 300);
+    const filas = lista.map(x => {
+      const i = IX.insumos.get(x.insumoId);
+      return '<tr><td>' + fechaCorta(x.fecha) + '</td><td>' + (i ? '<a href="#insumo-' + i.id + '">' + esc(i.nombre) + '</a>' : '<span class="tenue">Insumo eliminado</span>') + '</td><td><span class="pill ' + (TIPOS_MOV[x.tipo] || ['', ''])[1] + '">' + (TIPOS_MOV[x.tipo] || [x.tipo])[0] + '</span></td>'
+        + '<td class="num"><b>' + (i ? (x.cantidad > 0 ? '+' : '') + legibleIns(i, x.cantidad) : C.fmtCant(x.cantidad)) + '</b></td><td>' + esc(x.nota || x.referencia || '') + (x.por ? '<br><span class="tenue">' + esc(x.por) + '</span>' : '') + '</td>'
+        + '<td class="acc"><button class="icono-btn" data-accion="quitarMov" data-id="' + x.id + '" aria-label="Eliminar movimiento">✕</button></td></tr>';
+    }).join('');
+    ctx.acciones = {
+      filtroMov: d => { filtroMov.tipo = d.tipo; render(); },
+      quitarMov: d => confirmar('Eliminar movimiento', 'La existencia se recalcula sin este movimiento.', 'Eliminar', () => { db.movimientos = db.movimientos.filter(x => x.id !== d.id); guardar(true); render(); aviso('Movimiento eliminado'); })
+    };
+    return '<div class="cabecera"><div><span class="ceja">Inventario</span><h1>Movimientos</h1></div></div>'
+      + '<div class="pestanas">' + [['', 'Todos']].concat(Object.keys(TIPOS_MOV).map(t => [t, TIPOS_MOV[t][0]])).map(f => '<button class="' + (filtroMov.tipo === f[0] ? 'activa' : '') + '" data-accion="filtroMov" data-tipo="' + f[0] + '">' + f[1] + '</button>').join('') + '</div>'
+      + (filas ? '<section class="panel"><div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Insumo</th><th>Tipo</th><th class="num">Cantidad</th><th>Referencia</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div></section>' : '<div class="vacio"><p>Aún no hay movimientos.</p></div>');
+  }
+
+  const estadoConteo = { todos: false };
+  function vConteo() {
+    const st = stock();
+    const lista = db.insumos.filter(i => estadoConteo.todos || controlado(i, st)).sort((a, b) => String(a.categoria || '').localeCompare(String(b.categoria || ''), 'es') || sortNombre(a, b));
+    const uLeg = i => C.legible(1, C.dimension(i.unidadCompra)).u === 'pza' ? 'pza' : C.dimension(i.unidadCompra) === 'masa' ? 'kg' : 'l';
+    const fila = i => '<div class="precio-fila" data-id="' + i.id + '"><div class="pf-info"><b>' + esc(i.nombre) + '</b><span class="tenue pf-actual">En sistema: ' + legibleIns(i, st.get(i.id) || 0) + (i.inventario && i.inventario.ultimoConteo ? ' · contado ' + fechaCorta(i.inventario.ultimoConteo).toLowerCase() : '') + '</span></div>'
+      + '<div class="pf-edad">' + pillInv(estadoInv(i, st)) + '</div>'
+      + '<div class="pf-captura conteo"><input type="text" class="pf-precio cn-cant" inputmode="decimal" placeholder="Conteo" aria-label="Conteo de ' + esc(i.nombre) + '" autocomplete="off"><select class="cn-uni" aria-label="Unidad">' + opcionesUnidad(C.unidadesDe(C.dimension(i.unidadCompra)), uLeg(i)) + '</select>'
+      + '<button type="button" class="btn chico primario" data-accion="guardarConteo" data-id="' + i.id + '" aria-label="Guardar conteo de ' + esc(i.nombre) + '">' + ico('check') + '</button></div></div>';
+    const guardarFila = el => {
+      const i = IX.insumos.get(el.dataset.id); if (!i) return;
+      const txt = el.querySelector('.cn-cant').value.trim();
+      const sig = el.nextElementSibling && el.nextElementSibling.querySelector('.cn-cant');
+      if (txt === '') { if (sig) sig.focus(); return; }
+      const base = C.aBase(C.num(txt), el.querySelector('.cn-uni').value), ex = stock().get(i.id) || 0, delta = base - ex;
+      if (Math.abs(delta) > 1e-9) registrarMovimiento(i, 'ajuste', delta, { nota: 'Conteo físico' });
+      i.inventario = Object.assign({}, i.inventario, { ultimoConteo: hoyISO() });
+      guardar(true);
+      el.querySelector('.pf-actual').textContent = 'En sistema: ' + legibleIns(i, base) + (Math.abs(delta) > 1e-9 ? ' · diferencia ' + (delta > 0 ? '+' : '') + legibleIns(i, delta) : ' · sin diferencia');
+      el.querySelector('.pf-edad').innerHTML = pillInv(estadoInv(i, stock()));
+      el.querySelector('.cn-cant').value = ''; el.querySelector('.cn-cant').placeholder = C.fmtCant(C.convertir(base, C.BASE[C.dimension(i.unidadCompra)], el.querySelector('.cn-uni').value));
+      el.classList.add('hecho');
+      if (sig) sig.focus(); else el.querySelector('.cn-cant').blur();
+    };
+    ctx.acciones = { guardarConteo: (d, b) => guardarFila(b.closest('.precio-fila')), conteoTodos: () => { estadoConteo.todos = !estadoConteo.todos; render(); } };
+    ctx.alPintar = () => capaActual().querySelectorAll('.cn-cant').forEach(inp => inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); guardarFila(inp.closest('.precio-fila')); } }));
+    return '<div class="cabecera"><div><span class="ceja">Inventario</span><h1>Conteo físico</h1></div></div>'
+      + '<div class="nota">Cuenta lo que hay en almacén, escribe la cantidad y presiona <b>Enter</b>: se ajusta la existencia y pasa al siguiente. Con el campo vacío, Enter lo salta.</div>'
+      + '<div class="pestanas"><button class="' + (!estadoConteo.todos ? 'activa' : '') + '" data-accion="conteoTodos">Con registro</button><button class="' + (estadoConteo.todos ? 'activa' : '') + '" data-accion="conteoTodos">Todos los insumos</button></div>'
+      + (lista.length ? '<section class="panel lista-precios">' + lista.map(fila).join('') + '</section>' : '<div class="vacio"><p>Ningún insumo tiene registro todavía. Cambia a "Todos los insumos" para hacer el primer conteo.</p></div>');
+  }
+
+  /** Panel de inventario dentro de la pantalla de cada insumo. */
+  function panelInventarioInsumo(ins) {
+    ins.inventario = ins.inventario || {};
+    const st = stock(), ex = st.get(ins.id) || 0, est = estadoInv(ins, st);
+    const movs = db.movimientos.filter(m => m.insumoId === ins.id).sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')) || String(b.creado || '').localeCompare(String(a.creado || ''))).slice(0, 6);
+    return '<section class="panel"><div class="panel-cab"><h2>Inventario</h2><span id="invPill">' + pillInv(est) + '</span></div>'
+      + '<div class="caja-doble"><div><span class="et">Existencia</span><b>' + (est === 'sin-control' ? '—' : legibleIns(ins, ex)) + '</b></div><div><span class="et">Valor</span><b>' + dinero(Math.max(ex, 0) * C.costoBaseCompra(ins)) + '</b></div></div>'
+      + '<div class="acciones">' + Object.keys(TIPOS_MOV).map(t => '<button class="btn chico" data-accion="movRapido" data-id="' + ins.id + '" data-tipo="' + t + '">' + (t === 'ajuste' ? 'Ajustar' : TIPOS_MOV[t][0]) + '</button>').join('') + '</div>'
+      + '<div class="campos" style="grid-template-columns:repeat(2,minmax(0,1fr))">' + campoTexto('Existencia mínima', 'minimo', ins.inventario.minimo, { grupo: 'inventario', num: true })
+      + campoSelect('Unidad', 'minimoUnidad', ins.inventario.minimoUnidad || ins.unidadCompra, C.unidadesDe(C.dimension(ins.unidadCompra)).map(u => [u, C.nombreUnidad(u)]), { grupo: 'inventario' })
+      + campoTexto('Ubicación', 'ubicacion', ins.inventario.ubicacion, { grupo: 'inventario', ancho: true, ph: 'Cámara fría, anaquel 2…' }) + '</div>'
+      + (movs.length ? '<div class="resumen">' + movs.map(m => '<div class="fila"><span>' + (TIPOS_MOV[m.tipo] || [m.tipo])[0] + '<br><span class="tenue">' + fechaCorta(m.fecha) + (m.nota ? ' · ' + esc(m.nota) : '') + '</span></span><span>' + (m.cantidad > 0 ? '+' : '') + legibleIns(ins, m.cantidad) + '</span></div>').join('') + '</div>' : '<p class="tenue">Sin movimientos todavía.</p>')
+      + '</section>';
   }
 
   /* ================================================================ PROVEEDORES
@@ -1911,7 +2103,7 @@
       const wa = p && waDe(p.whatsapp || p.telefono);
       const min = p && C.num(p.pedidoMinimo);
       return '<section class="panel pedido"><div class="panel-cab"><div><h2>' + esc(nombre) + '</h2><p>' + filas.length + ' insumo' + (filas.length === 1 ? '' : 's') + ' · ' + dinero(total) + (p && p.entrega ? ' · entrega ' + esc(p.entrega) : '') + '</p></div>'
-        + '<div class="acciones">' + (nombre !== 'Sin proveedor' ? '<button type="button" class="btn chico" data-ped="orden" data-k="' + k + '">' + ico('imprimir') + 'Orden de compra</button><button type="button" class="btn chico" data-ped="copiar" data-k="' + k + '">' + ico('copiar') + 'Copiar</button>' : '') + (wa ? '<a class="btn chico primario" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(textoPedido(nombre, filas, nota)) + '" target="_blank" rel="noopener">' + ico('chat') + 'WhatsApp</a>' : '') + '</div></div>'
+        + '<div class="acciones"><button type="button" class="btn chico" data-ped="recibir" data-k="' + k + '">' + ico('inventario') + 'Recibir</button>' + (nombre !== 'Sin proveedor' ? '<button type="button" class="btn chico" data-ped="orden" data-k="' + k + '">' + ico('imprimir') + 'Orden de compra</button><button type="button" class="btn chico" data-ped="copiar" data-k="' + k + '">' + ico('copiar') + 'Copiar</button>' : '') + (wa ? '<a class="btn chico primario" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(textoPedido(nombre, filas, nota)) + '" target="_blank" rel="noopener">' + ico('chat') + 'WhatsApp</a>' : '') + '</div></div>'
         + (min && total < min ? '<div class="nota alerta">El pedido mínimo de este proveedor es ' + dinero(min) + '.</div>' : '')
         + (nombre === 'Sin proveedor' ? '<div class="nota">Estos insumos no tienen proveedor. Asígnalo en "Dónde se cotizó" de cada insumo.</div>' : '')
         + '<div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Comprar</th><th class="num">Costo</th></tr></thead><tbody>' + filas.map(f => '<tr><td>' + esc(f.nombre) + '</td><td class="num">' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + esc(C.nombreUnidad(f.unidadCompra)) + '</td><td class="num">' + dinero(f.costoCompra) + '</td></tr>').join('') + '</tbody></table></div></section>';
@@ -1921,6 +2113,12 @@
       alAbrir: c => c.addEventListener('click', ev => {
         const b = ev.target.closest('[data-ped]'); if (!b) return;
         const [nombre, filas] = grupos[+b.dataset.k];
+        if (b.dataset.ped === 'recibir') {
+          if (!puedeEditar()) return;
+          filas.forEach(f => { const ins = IX.insumos.get(f.id); if (ins && f.empaquesCompra > 0) registrarMovimiento(ins, 'entrada', f.empaquesCompra * C.aBase(f.presentacion, f.unidadCompra), { nota: 'Pedido recibido · ' + nombre, proveedor: nombre, costo: C.r2(f.costoCompra) }); });
+          guardar(true); b.disabled = true; b.lastChild.textContent = 'Recibido'; aviso('Entrada registrada: ' + filas.length + ' insumos de ' + nombre);
+          return;
+        }
         if (b.dataset.ped === 'orden') imprimir(docOrdenCompra(nombre, filas, nota));
         else { const t = textoPedido(nombre, filas, nota); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => aviso('Pedido copiado: pégalo en WhatsApp o correo')).catch(() => aviso('No se pudo copiar', true)); }
       })
@@ -2227,7 +2425,7 @@
       }),
       cargarEjemplo: () => confirmar('Cargar datos de ejemplo', 'Se agregarán los insumos, recetas, servicios y el evento de ejemplo a tu información actual.', 'Agregar', () => {
         const ej = D.ejemplo();
-        ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); ej[k].forEach(x => { if (!ids.has(x.id)) db[k].push(x); }); });
+        ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores', 'movimientos'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); ej[k].forEach(x => { if (!ids.has(x.id)) db[k].push(x); }); });
         cambioEstructura(); aviso('Datos de ejemplo agregados'); render();
       }),
       subirLocal: () => confirmar('Subir a la nube', 'Se agregarán a la nube los insumos, recetas, servicios y eventos guardados en este navegador que todavía no estén en ella. No se borra nada.', 'Subir', subirDatosLocales),

@@ -86,8 +86,8 @@ service cloud.firestore {
     }
 
     match /{col}/{id} {
-      allow read: if conAcceso() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados', 'solicitudes', 'proveedores'];
-      allow write: if puedeEditar() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados', 'solicitudes', 'proveedores'];
+      allow read: if conAcceso() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados', 'solicitudes', 'proveedores', 'movimientos'];
+      allow write: if puedeEditar() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados', 'solicitudes', 'proveedores', 'movimientos'];
     }
   }
 }
