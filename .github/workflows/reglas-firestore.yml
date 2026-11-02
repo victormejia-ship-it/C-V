@@ -1,0 +1,52 @@
+# Publica las reglas de seguridad de Firestore (config/firestore.rules) en el
+# proyecto de Firebase "civizo" cada vez que cambian en main. También se puede
+# correr a mano desde la pestaña Actions → "Publicar reglas de Firestore" → Run workflow.
+#
+# Requiere el secreto FIREBASE_SERVICE_ACCOUNT (JSON de una cuenta de servicio
+# del proyecto). Ver docs/FIREBASE.md → "Publicación automática de reglas".
+name: Publicar reglas de Firestore
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - config/firestore.rules
+      - firebase.json
+      - .github/workflows/reglas-firestore.yml
+  workflow_dispatch:
+
+concurrency:
+  group: reglas-firestore
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publicar:
+    runs-on: ubuntu-latest
+    env:
+      SA: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+      PROYECTO: civizo
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Verificar credenciales
+        run: |
+          if [ -z "$SA" ]; then
+            echo "::error::Falta el secreto FIREBASE_SERVICE_ACCOUNT. Agrégalo en Settings → Secrets and variables → Actions (ver docs/FIREBASE.md)."
+            exit 1
+          fi
+          printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
+          echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Publicar reglas
+        run: npx -y firebase-tools@13 deploy --only firestore:rules --project "$PROYECTO" --non-interactive
+
+      - name: Borrar credenciales
+        if: always()
+        run: rm -f "$RUNNER_TEMP/sa.json"

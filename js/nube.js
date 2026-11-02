@@ -24,7 +24,7 @@
   const CFG = raizGlobal.CONFIG_NUBE || {};
   const HAY_NUBE = !!(CFG.apiKey && CFG.projectId);
   const LLAVE_SESION = 'civizo.sesion.v1';
-  const COLS = ['insumos', 'recetas', 'servicios', 'eventos'];
+  const COLS = ['insumos', 'recetas', 'servicios', 'eventos', 'solicitudes'];
   const ROLES = [
     { id: 'owner', nombre: 'Dueño', desc: 'Todo, incluidas las cuentas' },
     { id: 'admin', nombre: 'Administrador', desc: 'Todo, incluidas las cuentas y ajustes' },
@@ -147,6 +147,18 @@
   async function escribir(ruta, obj) { await pedir('/' + ruta, { method: 'PATCH', body: JSON.stringify({ fields: aCampos(JSON.parse(JSON.stringify(obj))) }) }); }
   async function borrar(ruta) { await pedir('/' + ruta, { method: 'DELETE' }); }
   const rutaDoc = (col, id) => col + '/' + encodeURIComponent(id);
+
+  /* Lectura y escritura públicas (sin sesión): el sitio web lee su contenido y
+     envía solicitudes de cotización. Las reglas deciden qué se permite. */
+  async function publico(ruta, op) {
+    const sep = ruta.includes('?') ? '&' : '?';
+    let r;
+    try { r = await fetchConTimeout(raiz() + ruta + sep + 'key=' + encodeURIComponent(CFG.apiKey), Object.assign({ headers: { 'Content-Type': 'application/json' } }, op || {})); }
+    catch (e) { throw new Error('Sin conexión con el servidor.'); }
+    if (r.status === 404) return null;
+    if (!r.ok) { const e = new Error(r.status === 403 ? 'SIN_PERMISO' : 'HTTP ' + r.status); e.status = r.status; throw e; }
+    return r.json().catch(() => null);
+  }
 
   /* --------------------------------------------------- Comparación */
   function canon(v) {
@@ -305,6 +317,23 @@
       marca = nueva;
       return hubo;
     },
+
+    /* ----------------------------------------------- Sitio web */
+    /** Contenido público del sitio y sus fotos (no requiere sesión). */
+    async leerSitio() {
+      const [doc, fotos] = await Promise.all([
+        publico('/sitio/publico').catch(() => null),
+        publico('/sitio_fotos?pageSize=50').catch(() => null)
+      ]);
+      const f = {};
+      ((fotos && fotos.documents) || []).forEach(d => { const o = docDe(d); if (o.data) f[o.id] = o.data; });
+      return { contenido: doc ? docDe(doc) : null, fotos: f };
+    },
+    async guardarSitio(contenido) { const o = Object.assign({}, contenido); delete o.id; await escribir('sitio/publico', o); },
+    async guardarFoto(slot, data) { await escribir('sitio_fotos/' + encodeURIComponent(slot), { data, actualizado: new Date().toISOString() }); },
+    async borrarFoto(slot) { await borrar('sitio_fotos/' + encodeURIComponent(slot)); },
+    /** Solicitud de cotización enviada desde el sitio (sin sesión). */
+    async enviarSolicitud(sol) { await publico('/solicitudes', { method: 'POST', body: JSON.stringify({ fields: aCampos(sol) }) }); },
 
     /* ----------------------------------------------- Cuentas (admin) */
     async usuarios() { return listar('usuarios'); },

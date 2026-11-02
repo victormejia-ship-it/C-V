@@ -67,3 +67,35 @@ seguridad está en las reglas del paso 3.
   estás escribiendo en ese momento no se pisa.
 - Consumo aproximado: unas 5 lecturas por minuto por pantalla abierta, muy
   por debajo del plan gratuito (50,000 lecturas diarias).
+
+## Sitio web y solicitudes
+
+Las reglas incluyen lo que necesita el sitio público:
+
+- `sitio/publico` y `sitio_fotos/*`: cualquiera los lee; solo administradores publican.
+- `solicitudes/*`: un visitante sin cuenta **solo puede crear** una solicitud nueva con
+  campos y tamaños limitados. Leerlas y darles seguimiento es del equipo.
+
+Cada vez que cambie `config/firestore.rules` hay que volver a publicarlas en la consola
+(Firestore Database → Reglas → pegar → Publicar).
+
+## Publicación automática de reglas
+
+`.github/workflows/reglas-firestore.yml` publica `config/firestore.rules` en el proyecto
+`civizo` cada vez que cambian en `main`. Configuración de una sola vez:
+
+1. Consola de Firebase → ⚙ **Configuración del proyecto** → pestaña **Cuentas de servicio**
+   → **Generar nueva clave privada** → **Generar clave**. Se descarga un archivo `.json`.
+2. GitHub → repositorio **C-V** → **Settings** → **Secrets and variables** → **Actions** →
+   **New repository secret**.
+   - Name: `FIREBASE_SERVICE_ACCOUNT`
+   - Secret: pega **todo** el contenido del archivo `.json`.
+   - **Add secret**.
+3. Borra el archivo `.json` de tu equipo. GitHub lo guarda cifrado y no lo vuelve a mostrar.
+
+Para probarlo sin cambiar las reglas: pestaña **Actions** → **Publicar reglas de Firestore**
+→ **Run workflow**.
+
+Esa clave tiene permisos amplios sobre el proyecto. Para limitarla, en Google Cloud →
+IAM se puede crear otra cuenta de servicio solo con el rol **Firebase Rules Admin** y usar
+su clave en el mismo secreto.

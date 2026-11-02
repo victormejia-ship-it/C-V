@@ -8,6 +8,23 @@ Es una página estática, sin servidor, en el mismo estilo que Forguard y
 Profectus: se abre `index.html` y funciona. Todo está en español y con la
 marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 
+## Una sola plataforma: sitio público + administración
+
+| Dirección | Qué es |
+| --- | --- |
+| `/` (`index.html`) | **Sitio web público** de CIVIZO: portada, servicios, cómo trabajamos, nosotros, identidad, galería y formulario de cotización. |
+| `/app.html` | **Plataforma** de administración (con acceso por cuenta). El sitio tiene un enlace "Acceso". |
+
+- **Plataforma → Sitio web** (solo administradores): textos de la portada, "Nosotros",
+  contacto (WhatsApp, teléfono, correo, horario), servicios visibles y **fotos** de cada
+  espacio (portada, cinco líneas de servicio y galería). Las fotos se ajustan y comprimen
+  solas. Sin foto, el espacio muestra una pieza de la marca en carbón y naranja.
+- **Plataforma → Solicitudes**: lo que la gente envía desde el formulario del sitio llega
+  aquí con aviso en el inicio. Se marca en seguimiento, se descarta o se convierte en
+  **evento** con un toque (cliente, contacto, fecha y personas ya capturados).
+- Los enlaces viejos (`/#receta-…`, `/#eventos`) llevan solos a `app.html`.
+- Las fotos de identidad (`assets/sitio/`) son recortes del manual de marca.
+
 ## Cómo se navega
 
 - **Inicio**: íconos de cada función, un saludo y el resumen del día. La lupa
@@ -84,7 +101,11 @@ ejemplo; se borran con un botón y lo tuyo se queda.
 ## Estructura
 
 ```
-index.html          Página
+index.html          Sitio web público
+app.html            Plataforma de administración
+css/sitio.css       Estilos del sitio público
+js/sitio.js         Contenido publicado y formulario del sitio
+assets/sitio/       Piezas de la marca para el sitio
 css/civizo.css      Estilos con la paleta de marca (claro / oscuro / impresión)
 js/config.js        Datos del proyecto de Firebase (vacío = modo local)
 js/nube.js          Acceso, cuentas y sincronización con Firestore (REST)

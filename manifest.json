@@ -3,7 +3,7 @@
   "short_name": "CIVIZO",
   "description": "Costeo de servicios de alimentos y eventos, recetas estandarizadas y escalado de producción.",
   "lang": "es-MX",
-  "start_url": "./",
+  "start_url": "./app.html",
   "display": "standalone",
   "background_color": "#2B2B2B",
   "theme_color": "#2B2B2B",
