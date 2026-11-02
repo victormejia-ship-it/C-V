@@ -9,6 +9,6 @@
    │  Ver docs/FIREBASE.md                                                  │
    └───────────────────────────────────────────────────────────────────────┘ */
 window.CONFIG_NUBE = {
-  apiKey: '',
-  projectId: ''
+  apiKey: 'AIzaSyDZ9g6LdYg90G5QL7UQytycRQIEO9ulKc4',
+  projectId: 'civizo'
 };
