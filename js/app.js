@@ -94,6 +94,8 @@
     escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>',
     externo: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    chat: '<path d="M4 20l1.3-4A8 8 0 1 1 8 19l-4 1z"/>',
+    telefono: '<path d="M5 4h3l2 5-2.5 1.5a11 11 0 0 0 6 6L15 14l5 2v3a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/>',
     cobranza: '<path d="M6 6V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><path d="M15.5 15h2.5"/>',
     web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
     bandeja: '<path d="M3 13l2.5-8h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/>',
@@ -176,7 +178,7 @@
   let pila = [];
   let entradas = 0;
   const limpiar = h => decodeURIComponent(String(h || '').replace(/^#/, ''));
-  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento|insumo|cobro)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
+  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento|insumo|cobro|proveedor)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
   const tope = () => pila.length ? pila[pila.length - 1] : 'inicio';
   const urlDe = () => pila.length ? '#' + tope() : location.pathname + location.search;
   function estadoHist() { return { civizo: true, pila: pila.slice(), entradas }; }
@@ -268,7 +270,7 @@
     const c = capaActual();
     if (!c || !c.classList.contains('capa')) return pintar('reemplazo');
     const ruta = c.dataset.ruta, r = rutaDe(ruta);
-    const vistas = { cobranza: vCobranza, cobro: vCobro, sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
+    const vistas = { proveedores: vProveedores, proveedor: vProveedor, comparar: vComparar, cobranza: vCobranza, cobro: vCobro, sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
     if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; delete vistas.sitio; }
     if (!NUBE) delete vistas.usuarios;
     ctx = { obj: null, recalcular: null, acciones: {} };
@@ -619,7 +621,7 @@
     if (!(C.num(i.precio) > 0)) return '<span class="pill alerta">Sin precio</span>';
     return '<span class="pill ' + ((diasDesde(i.actualizado) ?? 999) > vigencia() ? 'alerta' : '') + '">' + textoEdad(i.actualizado) + '</span>';
   }
-  const datalistFuentes = () => '<datalist id="dl-fuentes">' + Array.from(new Set(FUENTES.concat(db.insumos.map(i => i.proveedor).filter(Boolean)))).map(f => '<option value="' + esc(f) + '">').join('') + '</datalist>';
+  const datalistFuentes = () => '<datalist id="dl-fuentes">' + Array.from(new Set((db.proveedores || []).map(p => p.nombre).filter(Boolean).concat(FUENTES).concat(db.insumos.map(i => i.proveedor).filter(Boolean)))).map(f => '<option value="' + esc(f) + '">').join('') + '</datalist>';
 
   /** Cambia el precio de costeo y lo anota en el historial (agrupa capturas seguidas). */
   function registrarPrecio(ins, v, fuente) {
@@ -1351,6 +1353,7 @@
     abrirModal({
       titulo, cuerpo, ancho: true,
       botones: [
+        { texto: ico('proveedores') + 'Pedidos por proveedor', clase: '', accion: () => { modalPedidos(lista, titulo); return false; } },
         { texto: ico('bajar') + 'Descargar CSV', clase: '', accion: () => { descargar('compras-' + slug(nombre) + '.csv', csv([['insumo', 'categoria', 'proveedor', 'neto', 'bruto', 'unidad', 'empaques', 'presentacion', 'costo']].concat(lista.map(f => { const l = C.legible(f.brutaBase, f.dim); const ln = C.legible(f.netaBase, f.dim); return [f.nombre, f.categoria, f.proveedor, C.r2(C.convertir(ln.cant, ln.u, l.u)), C.r2(l.cant), C.nombreUnidad(l.u), f.empaquesCompra, f.presentacion + ' ' + C.nombreUnidad(f.unidadCompra), C.r2(f.costoCompra)]; }))), 'text/csv'); return false; } },
         { texto: ico('imprimir') + 'Imprimir', clase: 'primario', accion: () => { imprimir(docProduccion(titulo, lista, preps, evento)); return false; } }
       ],
@@ -1389,6 +1392,7 @@
       ico2('recetas', 'recetas', 'Recetas', conError || ''),
       btnIco('abrirEscalador', 'escalar', 'Escalar'),
       ico2('compras', 'compras', 'Compras', porSurtir || ''),
+      ico2('proveedores', 'proveedores', 'Proveedores', fuentesUsadas().filter(f => !provPorNombre(f)).length ? '+' : ''),
       ico2('insumos', 'insumos', 'Insumos', db.insumos.filter(vencido).length || ''),
       ico2('tablero', 'tablero', 'Tablero')
     ];
@@ -1413,7 +1417,7 @@
       + '<h1>' + saludoHora() + (nombre ? ', <b>' + esc(nombre.split(' ')[0]) + '</b>' : '') + '</h1>'
       + '<div class="resumen-dia">' + resumen.map(t => '<span><i></i>' + t + '</span>').join('') + '</div></div>'
       + '<nav class="iconos" aria-label="Funciones">' + iconos.join('') + '</nav>'
-      + '<div class="separador">Próximamente</div><div class="iconos">' + prox('inventario', 'Inventario') + prox('proveedores', 'Proveedores') + '</div>'
+      + '<div class="separador">Próximamente</div><div class="iconos">' + prox('inventario', 'Inventario') + '</div>'
       + (D.hayEjemplos(db) && puedeEditar() ? '<div class="aviso-ejemplo"><span>Estás usando datos de ejemplo.</span><button class="btn chico" data-accion="quitarEjemplos">Borrarlos</button></div>' : '')
       + '</div>'
       + (puedeEditar() ? '<button type="button" class="fab" data-accion="crear" aria-label="Crear" title="Crear">' + ico('mas') + '</button>' : '');
@@ -1520,7 +1524,8 @@
     ctx.acciones = {
       alternarEvento: d => { const i = e.fuera.indexOf(d.id); if (i >= 0) e.fuera.splice(i, 1); else e.fuera.push(d.id); render(); },
       imprimirCompras: () => imprimir(docProduccion(titulo, lista, preps, null)),
-      csvCompras: () => descargar('compras-' + e.desde + '-a-' + e.hasta + '.csv', csvCompras(lista), 'text/csv')
+      csvCompras: () => descargar('compras-' + e.desde + '-a-' + e.hasta + '.csv', csvCompras(lista), 'text/csv'),
+      pedidosProveedor: () => modalPedidos(lista, titulo)
     };
     ctx.alPintar = () => {
       $('cDesde').addEventListener('change', ev => { e.desde = ev.target.value; render(); });
@@ -1528,7 +1533,7 @@
       capaActual().querySelectorAll('[data-est]').forEach(ch => ch.addEventListener('change', () => { e.est = Array.from(capaActual().querySelectorAll('[data-est]:checked')).map(x => x.value); render(); }));
     };
     return '<div class="cabecera"><div><span class="ceja">Cocina y producción</span><h1>Producción y compras</h1><p class="sub">Junta todo lo que hay que preparar y comprar para los eventos de un periodo. Cada receta y sub-receta se escala y se suma con su merma.</p></div>'
-      + '<div class="acciones"><button class="btn" data-accion="csvCompras">' + ico('bajar') + 'Descargar CSV</button><button class="btn primario" data-accion="imprimirCompras">' + ico('imprimir') + 'Imprimir</button></div></div>'
+      + '<div class="acciones"><button class="btn" data-accion="pedidosProveedor">' + ico('proveedores') + 'Pedidos por proveedor</button><button class="btn" data-accion="csvCompras">' + ico('bajar') + 'Descargar CSV</button><button class="btn primario" data-accion="imprimirCompras">' + ico('imprimir') + 'Imprimir</button></div></div>'
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<div class="metricas"><div class="metrica destacada"><span class="et">Compra estimada</span><span class="val">' + dinero(total) + '</span><span class="det">empaques completos</span></div><div class="metrica"><span class="et">Eventos</span><span class="val">' + elegidos.length + '</span><span class="det">de ' + eventos.length + ' en el periodo</span></div><div class="metrica"><span class="et">Personas</span><span class="val">' + n0(pax) + '</span><span class="det">a atender</span></div><div class="metrica"><span class="et">Insumos</span><span class="val">' + lista.length + '</span><span class="det">' + preps.length + ' preparaciones</span></div></div>'
       + '<section class="panel"><h2>Preparaciones</h2>' + (preps.length ? '<div class="tabla-env"><table><thead><tr><th>Receta</th><th class="num">Porciones</th><th class="num">Volumen</th><th class="num">Factor</th></tr></thead><tbody>' + preps.map(p => { const rb = C.rendimientoBase(p.r); return '<tr class="clic" tabindex="0" data-ir="#receta-' + p.r.id + '"><td>' + esc(p.r.nombre) + (p.base ? ' <span class="pill">base</span>' : '') + '</td><td class="num"><b>' + C.fmtCant(p.porc) + '</b></td><td class="num">' + (rb ? C.fmtLegible(rb.base * p.porc / C.porcionesReceta(p.r), rb.dim) : '—') + '</td><td class="num">×' + C.fmtCant(p.porc / C.porcionesReceta(p.r)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="tenue">Nada que preparar con los eventos elegidos.</p>') + '</section>'
@@ -1595,7 +1600,7 @@
   }
 
   /* ---------------------------------------------------------- Solo lectura */
-  const ACC_LECTURA = new Set(['filtroCobranza', 'recibo', 'estadoCuenta', 'verEvento', 'filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ACC_LECTURA = new Set(['irComparar', 'soloComp', 'pedidosProveedor', 'filtroCobranza', 'recibo', 'estadoCuenta', 'verEvento', 'filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
   const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
   function aplicarSoloLectura() {
     capaActual().querySelectorAll('input, select, textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
@@ -1666,7 +1671,7 @@
     const loc = datosLocalesGuardados();
     if (!loc) return aviso('No hay información guardada en este equipo', true);
     let n = 0;
-    ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); loc[k].forEach(x => { if (!ids.has(x.id)) { db[k].push(x); n++; } }); });
+    ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); loc[k].forEach(x => { if (!ids.has(x.id)) { db[k].push(x); n++; } }); });
     if (!db.insumos.length && !n) return aviso('No hay nada nuevo que subir');
     if (loc.empresa && !db.empresa.telefono && !db.empresa.correo) Object.assign(db.empresa, loc.empresa);
     cambioEstructura(); render();
@@ -1681,7 +1686,7 @@
         + (cuantos ? '<div class="nota acento">Este navegador tiene <b>' + cuantos + ' elementos</b> capturados en modo local. Puedes subirlos a la nube ahora.</div>' : '<p>La nube está vacía. Puedes empezar a capturar o cargar los datos de ejemplo.</p>'),
       botones: cuantos
         ? [{ texto: 'Después', clase: 'fantasma' }, { texto: 'Subir lo de este equipo', clase: 'primario', accion: () => subirDatosLocales() }]
-        : [{ texto: 'Empezar vacío', clase: 'fantasma' }, { texto: 'Cargar datos de ejemplo', clase: 'primario', accion: () => { const ej = D.ejemplo(); ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { db[k] = db[k].concat(ej[k]); }); cambioEstructura(); render(); } }]
+        : [{ texto: 'Empezar vacío', clase: 'fantasma' }, { texto: 'Cargar datos de ejemplo', clase: 'primario', accion: () => { const ej = D.ejemplo(); ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { db[k] = db[k].concat(ej[k]); }); cambioEstructura(); render(); } }]
     });
   }
   let pendienteRemoto = false, sondeando = false, tSondeo = null;
@@ -1722,6 +1727,218 @@
     });
     if (!N.sesion()) return pantallaAcceso();
     entrarConSesion();
+  }
+
+  /* ================================================================ PROVEEDORES
+     El vínculo con insumos y cotizaciones es por nombre (insumo.proveedor y
+     cotizacion.fuente). Cambiar el nombre del proveedor actualiza esas
+     referencias. */
+  const TIPOS_PROV = ['Supermercado', 'Mayorista / Central de abastos', 'Distribuidor', 'Productor', 'Club de precios', 'Otro'];
+  const PAGO_PROV = ['Contado', 'Crédito', 'Transferencia anticipada'];
+  const provPorNombre = nombre => db.proveedores.find(p => norm(p.nombre) === norm(nombre));
+  /** Todas las fuentes usadas en cotizaciones o como "dónde se cotizó". */
+  function fuentesUsadas() {
+    const m = new Map();
+    db.insumos.forEach(i => {
+      if (i.proveedor) m.set(norm(i.proveedor), m.get(norm(i.proveedor)) || i.proveedor);
+      (i.cotizaciones || []).forEach(c => { if (c.fuente) m.set(norm(c.fuente), m.get(norm(c.fuente)) || c.fuente); });
+    });
+    return Array.from(m.values());
+  }
+  /** Mejor precio por unidad de cada insumo y quién lo da. */
+  function mejoresPrecios() {
+    const r = new Map();
+    db.insumos.forEach(i => {
+      const dim = C.dimension(i.unidadCompra);
+      let mejor = null;
+      (i.cotizaciones || []).forEach(c => {
+        if (C.dimension(c.unidad) !== dim) return;
+        const u = costoPorUnidad(c.precio, c.presentacion, c.unidad);
+        if (u > 0 && (!mejor || u < mejor.porU)) mejor = { porU: u, fuente: c.fuente, cot: c };
+      });
+      r.set(i.id, mejor);
+    });
+    return r;
+  }
+  function statsProveedor(nombre, mejores) {
+    mejores = mejores || mejoresPrecios();
+    const filas = [];
+    db.insumos.forEach(i => {
+      const dim = C.dimension(i.unidadCompra);
+      const cots = (i.cotizaciones || []).filter(c => norm(c.fuente) === norm(nombre) && C.dimension(c.unidad) === dim);
+      if (!cots.length) return;
+      const c = cots.slice().sort((a, b) => String(b.fecha || '').localeCompare(String(a.fecha || '')))[0];
+      const porU = costoPorUnidad(c.precio, c.presentacion, c.unidad), m = mejores.get(i.id);
+      filas.push({ ins: i, cot: c, porU, mejor: m, esMejor: m && porU <= m.porU + 1e-9, sobre: m && m.porU > 0 ? (porU - m.porU) / m.porU * 100 : 0, enCosteo: norm(i.proveedor) === norm(nombre) });
+    });
+    const ultima = filas.reduce((u, f) => String(f.cot.fecha || '') > u ? String(f.cot.fecha) : u, '');
+    return { filas, n: filas.length, mejor: filas.filter(f => f.esMejor).length, enCosteo: filas.filter(f => f.enCosteo).length, ultima };
+  }
+  function nuevoProveedor(nombre, abrirDespues) {
+    const p = { id: 'prv-' + D.uid(), nombre: nombre || '', tipo: '', contacto: '', telefono: '', whatsapp: '', correo: '', direccion: '', web: '', rfc: '', pago: 'Contado', diasCredito: '', pedidoMinimo: '', entrega: '', notas: '', creado: D.ahora(), actualizado: D.ahora() };
+    db.proveedores.push(p); cambioEstructura();
+    if (abrirDespues !== false) { abrir('proveedor-' + p.id); setTimeout(() => { const n = $('f-nombre'); if (n && !nombre) n.focus(); }, 60); }
+    return p;
+  }
+  const filtroProv = { q: '' };
+  function vProveedores() {
+    const mejores = mejoresPrecios();
+    const q = norm(filtroProv.q);
+    const lista = db.proveedores.filter(p => !q || norm([p.nombre, p.tipo, p.contacto].join(' ')).includes(q)).map(p => ({ p, s: statsProveedor(p.nombre, mejores) }))
+      .sort((a, b) => b.s.n - a.s.n || sortNombre(a.p, b.p));
+    const detectados = fuentesUsadas().filter(f => !provPorNombre(f)).sort((a, b) => a.localeCompare(b, 'es'));
+    const tarjeta = ({ p, s }) => '<a class="tarjeta" href="#proveedor-' + p.id + '"><div class="tarjeta-cab"><h3>' + esc(p.nombre || 'Proveedor sin nombre') + '</h3>' + (p.tipo ? '<span class="pill">' + esc(p.tipo) + '</span>' : '') + '</div>'
+      + '<span class="meta">' + esc([p.contacto, p.telefono || p.whatsapp, p.pago === 'Crédito' && C.num(p.diasCredito) ? 'crédito ' + C.num(p.diasCredito) + ' días' : p.pago].filter(Boolean).join(' · ') || 'Sin datos de contacto') + '</span>'
+      + '<div class="cifras"><div><b>' + s.n + '</b><span>insumos cotizados</span></div><div><b>' + s.mejor + '</b><span>con el mejor precio</span></div><div><b>' + (s.ultima ? textoEdad(s.ultima) : '—') + '</b><span>última cotización</span></div></div></a>';
+    ctx.acciones = {
+      agregarDetectado: d => { nuevoProveedor(d.nombre, false); render(); aviso('Proveedor agregado: ' + d.nombre); },
+      agregarTodos: () => { detectados.forEach(n => nuevoProveedor(n, false)); render(); aviso(detectados.length + ' proveedores agregados'); },
+      nuevoProveedor: () => nuevoProveedor(''),
+      irComparar: () => abrir('comparar')
+    };
+    ctx.alPintar = () => { const b = $('fqv'); b.addEventListener('input', () => { filtroProv.q = b.value; const pos = b.selectionStart; render(); const nb = $('fqv'); nb.focus(); try { nb.setSelectionRange(pos, pos); } catch (er) { /* */ } }); };
+    return '<div class="cabecera"><div><span class="ceja">Compras</span><h1>Proveedores</h1></div><div class="acciones"><button class="btn" data-accion="irComparar">' + ico('tablero') + 'Comparar precios</button><button class="btn primario" data-accion="nuevoProveedor">' + ico('mas') + 'Nuevo proveedor</button></div></div>'
+      + (detectados.length ? '<section class="panel"><div class="panel-cab"><div><h2>Detectados en tus cotizaciones</h2><p>Tiendas que ya usas y aún no están en tu catálogo.</p></div>' + (detectados.length > 1 ? '<button class="btn chico" data-accion="agregarTodos">Agregar todos</button>' : '') + '</div><div class="chips-sel">' + detectados.map(n => '<button type="button" class="btn chico" data-accion="agregarDetectado" data-nombre="' + esc(n) + '">' + ico('mas') + esc(n) + '</button>').join('') + '</div></section>' : '')
+      + '<div class="filtros"><input type="search" id="fqv" placeholder="Buscar proveedor" value="' + esc(filtroProv.q) + '" aria-label="Buscar proveedor"></div>'
+      + (lista.length ? '<div class="tarjetas">' + lista.map(tarjeta).join('') + '</div>' : '<div class="vacio"><h3>' + (db.proveedores.length ? 'Ningún proveedor coincide' : 'Aún no hay proveedores') + '</h3><p>Agrega a quién le compras: contacto, condiciones de pago y días de entrega. Sus cotizaciones se ligan solas por el nombre.</p><button class="btn primario" data-accion="nuevoProveedor">' + ico('mas') + 'Nuevo proveedor</button></div>');
+  }
+  function telLimpio(t) { return String(t || '').replace(/[^\d+]/g, ''); }
+  function waDe(t) { const n = String(t || '').replace(/\D/g, ''); return n.length >= 10 ? (n.length === 10 ? '52' + n : n) : ''; }
+  function vProveedor(id) {
+    const p = db.proveedores.find(x => x.id === id);
+    if (!p) return noEncontrado('El proveedor');
+    ctx.obj = p;
+    const s = statsProveedor(p.nombre);
+    const filas = s.filas.sort((a, b) => a.ins.nombre.localeCompare(b.ins.nombre, 'es')).map(f => '<tr class="clic" tabindex="0" data-ir="#insumo-' + f.ins.id + '"><td><b>' + esc(f.ins.nombre) + '</b>' + (f.enCosteo ? ' <span class="pill acento">En costeo</span>' : '') + '<br><span class="tenue">' + textoEdad(f.cot.fecha) + '</span></td>'
+      + '<td class="num">' + dinero(f.cot.precio) + '<br><span class="tenue">' + C.fmtCant(f.cot.presentacion) + ' ' + esc(C.nombreUnidad(f.cot.unidad)) + '</span></td>'
+      + '<td class="num"><b>' + dinero(f.porU) + ' / ' + unBase(C.dimension(f.cot.unidad)) + '</b></td>'
+      + '<td>' + (f.esMejor ? '<span class="pill ok">Mejor precio</span>' : '<span class="pill alerta">+' + f.sobre.toFixed(1) + ' %</span><br><span class="tenue">' + esc(f.mejor.fuente) + ' ' + dinero(f.mejor.porU) + '</span>') + '</td></tr>').join('');
+    const nombreViejo = { v: p.nombre };
+    ctx.alCambiar = (obj, campo, v) => {
+      if (campo !== 'nombre') return false;
+      const viejo = nombreViejo.v;
+      if (viejo && norm(viejo) !== norm(v) && v.trim()) {
+        db.insumos.forEach(i => { if (norm(i.proveedor) === norm(viejo)) i.proveedor = v; (i.cotizaciones || []).forEach(c => { if (norm(c.fuente) === norm(viejo)) c.fuente = v; }); });
+        nombreViejo.v = v;
+      }
+      obj.nombre = v; return true;
+    };
+    ctx.recalcular = () => actualizarTitulo(p.nombre || 'Proveedor');
+    ctx.acciones = {
+      eliminar: () => confirmar('Eliminar proveedor', 'Se quitará <b>' + esc(p.nombre || 'este proveedor') + '</b> del catálogo. Sus cotizaciones en los insumos se conservan.', 'Eliminar', () => { db.proveedores = db.proveedores.filter(x => x.id !== p.id); cambioEstructura(); atras(); aviso('Proveedor eliminado'); })
+    };
+    const wa = waDe(p.whatsapp || p.telefono);
+    return '<div class="cabecera"><div><span class="ceja">Proveedor' + (p.tipo ? ' · ' + esc(p.tipo) : '') + '</span><h1>' + esc(p.nombre || 'Nuevo proveedor') + '</h1></div>'
+      + '<div class="acciones">' + (wa ? '<a class="btn" href="https://wa.me/' + wa + '" target="_blank" rel="noopener">' + ico('chat') + 'WhatsApp</a>' : '') + (p.telefono ? '<a class="btn" href="tel:' + esc(telLimpio(p.telefono)) + '">' + ico('telefono') + 'Llamar</a>' : '') + (p.web ? '<a class="btn" href="' + esc(/^https?:/.test(p.web) ? p.web : 'https://' + p.web) + '" target="_blank" rel="noopener">' + ico('externo') + 'Sitio</a>' : '') + '<button class="btn peligro" data-accion="eliminar">' + ico('borrar') + 'Eliminar</button></div></div>'
+      + '<div class="rejilla r-lateral"><div class="rejilla">'
+      + '<section class="panel"><h2>Datos</h2><div class="campos">'
+      + campoTexto('Nombre', 'nombre', p.nombre, { ancho: true, ph: 'Ej. Central de Abastos, Carnes del Norte', ayuda: 'Debe coincidir con el nombre que usas en las cotizaciones' })
+      + campoSelect('Tipo', 'tipo', p.tipo, [['', 'Sin tipo']].concat(TIPOS_PROV))
+      + campoTexto('Contacto', 'contacto', p.contacto, { ph: 'Nombre de quien atiende' })
+      + campoTexto('Teléfono', 'telefono', p.telefono, { tipo: 'tel' }) + campoTexto('WhatsApp', 'whatsapp', p.whatsapp, { tipo: 'tel', ph: '81 1234 5678' })
+      + campoTexto('Correo', 'correo', p.correo, { tipo: 'email' }) + campoTexto('RFC', 'rfc', p.rfc)
+      + campoTexto('Dirección', 'direccion', p.direccion, { ancho: true }) + campoTexto('Sitio web', 'web', p.web, { ancho: true, ph: 'https://…' })
+      + '</div></section>'
+      + '<section class="panel"><div class="panel-cab"><div><h2>Lo que le cotizamos</h2><p>Su precio más reciente por insumo, comparado con el mejor que tienes.</p></div></div>'
+      + (filas ? '<div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Precio</th><th class="num">Por unidad</th><th>Comparado</th></tr></thead><tbody>' + filas + '</tbody></table></div>' : '<p class="tenue">Aún no hay cotizaciones con el nombre «' + esc(p.nombre) + '». Agrégalas desde cada insumo o en Actualizar precios.</p>')
+      + '</section></div><aside class="pegajoso rejilla">'
+      + '<section class="panel"><h2>Resumen</h2><div class="caja-doble"><div><span class="et">Cotizados</span><b>' + s.n + '</b></div><div class="acento"><span class="et">Mejor precio</span><b>' + s.mejor + '</b></div></div><div class="resumen"><div class="fila"><span>Insumos que costeas con él</span><span>' + s.enCosteo + '</span></div><div class="fila"><span>Última cotización</span><span>' + (s.ultima ? fechaCorta(s.ultima) : '—') + '</span></div></div></section>'
+      + '<section class="panel"><h2>Condiciones</h2><div class="campos" style="grid-template-columns:minmax(0,1fr)">'
+      + campoSelect('Forma de pago', 'pago', p.pago, PAGO_PROV)
+      + campoTexto('Días de crédito', 'diasCredito', p.diasCredito, { num: true, suf: 'días' })
+      + campoTexto('Pedido mínimo', 'pedidoMinimo', p.pedidoMinimo, { num: true, suf: 'MXN' })
+      + campoTexto('Días y horario de entrega', 'entrega', p.entrega, { ph: 'Lun a vie, 7:00 a 10:00' })
+      + campoTexto('Notas', 'notas', p.notas, { area: true, filas: 3 })
+      + '</div></section></aside></div>';
+  }
+
+  /* ---------------------------------------------------------------- Comparar precios */
+  const filtroComp = { cat: '', solo: 'varios' };
+  function vComparar() {
+    const mejores = mejoresPrecios();
+    const cats = Array.from(new Set(db.insumos.map(i => i.categoria || 'Otros'))).sort((a, b) => a.localeCompare(b, 'es'));
+    const base = db.insumos.filter(i => (!filtroComp.cat || (i.categoria || 'Otros') === filtroComp.cat));
+    const conCot = base.filter(i => (i.cotizaciones || []).filter(c => C.dimension(c.unidad) === C.dimension(i.unidadCompra)).length >= (filtroComp.solo === 'varios' ? 2 : 1)).sort(sortNombre);
+    const cuenta = new Map();
+    conCot.forEach(i => new Set((i.cotizaciones || []).map(c => norm(c.fuente))).forEach(f => cuenta.set(f, (cuenta.get(f) || 0) + 1)));
+    const nombreDe = f => { for (const i of db.insumos) for (const c of i.cotizaciones || []) if (norm(c.fuente) === f) return c.fuente; return f; };
+    const cols = Array.from(cuenta.entries()).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([f]) => ({ f, nombre: nombreDe(f) }));
+    let caros = 0;
+    const filas = conCot.map(i => {
+      const dim = C.dimension(i.unidadCompra), un = unBase(dim), m = mejores.get(i.id);
+      const actual = C.costoBaseCompra(i) * factorBase(dim);
+      const sobre = m && m.porU > 0 && actual > m.porU + 1e-6 ? (actual - m.porU) / m.porU * 100 : 0;
+      if (sobre > .5) caros++;
+      const celdas = cols.map(col => {
+        const cs = (i.cotizaciones || []).filter(c => norm(c.fuente) === col.f && C.dimension(c.unidad) === dim);
+        if (!cs.length) return '<td class="num tenue">—</td>';
+        const u = Math.min(...cs.map(c => costoPorUnidad(c.precio, c.presentacion, c.unidad)));
+        return '<td class="num' + (m && u <= m.porU + 1e-9 ? ' mejor' : '') + '">' + dinero(u) + '</td>';
+      }).join('');
+      return '<tr><td><a href="#insumo-' + i.id + '"><b>' + esc(i.nombre) + '</b></a><br><span class="tenue">por ' + un + ' · costeo ' + dinero(actual) + (i.proveedor ? ' (' + esc(i.proveedor) + ')' : '') + '</span></td>' + celdas
+        + '<td class="acc">' + (sobre > .5 ? '<span class="pill alerta">+' + sobre.toFixed(1) + ' %</span> <button class="btn chico" data-accion="usarMejor" data-id="' + i.id + '">Usar ' + esc(m.fuente) + '</button>' : '<span class="pill ok">Mejor</span>') + '</td></tr>';
+    }).join('');
+    ctx.acciones = {
+      usarMejor: d => { const i = IX.insumos.get(d.id), m = mejores.get(d.id); if (!i || !m) return; registrarPrecio(i, { precio: m.cot.precio, presentacion: m.cot.presentacion, unidadCompra: m.cot.unidad }, m.fuente); if (m.cot.enlace) i.enlace = m.cot.enlace; cambioEstructura(); render(); aviso(i.nombre + ': ahora se costea con ' + m.fuente); },
+      soloComp: d => { filtroComp.solo = d.solo; render(); }
+    };
+    ctx.alPintar = () => { $('fcc').addEventListener('change', ev => { filtroComp.cat = ev.target.value; render(); }); };
+    return '<div class="cabecera"><div><span class="ceja">Proveedores</span><h1>Comparar precios</h1></div></div>'
+      + '<div class="metricas"><div class="metrica destacada"><span class="et">Se pueden abaratar</span><span class="val">' + caros + '</span><span class="det">insumos costeados sin el mejor precio</span></div><div class="metrica"><span class="et">Comparados</span><span class="val">' + conCot.length + '</span><span class="det">insumos en la tabla</span></div><div class="metrica"><span class="et">Proveedores</span><span class="val">' + cuenta.size + '</span><span class="det">con cotizaciones</span></div><div class="metrica"><span class="et">Precio</span><span class="val" style="font-size:1rem">por kg, L o pza</span><span class="det">para comparar parejo</span></div></div>'
+      + '<div class="filtros"><select id="fcc" aria-label="Categoría"><option value="">Todas las categorías</option>' + cats.map(c => '<option' + (c === filtroComp.cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select>'
+      + '<div class="pestanas">' + [['varios', 'Con 2 o más cotizaciones'], ['todos', 'Todos los cotizados']].map(o => '<button class="' + (filtroComp.solo === o[0] ? 'activa' : '') + '" data-accion="soloComp" data-solo="' + o[0] + '">' + o[1] + '</button>').join('') + '</div></div>'
+      + (filas ? '<section class="panel"><div class="tabla-env"><table class="comparativo"><thead><tr><th>Insumo</th>' + cols.map(c => '<th class="num">' + esc(c.nombre) + '</th>').join('') + '<th></th></tr></thead><tbody>' + filas + '</tbody></table></div><p class="tenue">En verde, el mejor precio por unidad. Se comparan las cotizaciones más baratas de cada proveedor.</p></section>'
+        : '<div class="vacio"><h3>Nada que comparar todavía</h3><p>Agrega la cotización de dos o más tiendas en cada insumo, o en Actualizar precios, para verlas lado a lado.</p></div>');
+  }
+
+  /* ---------------------------------------------------------------- Pedidos por proveedor */
+  function gruposPorProveedor(lista) {
+    const g = new Map();
+    lista.forEach(f => { const k = f.proveedor || 'Sin proveedor'; if (!g.has(k)) g.set(k, []); g.get(k).push(f); });
+    return Array.from(g.entries()).sort((a, b) => (a[0] === 'Sin proveedor') - (b[0] === 'Sin proveedor') || a[0].localeCompare(b[0], 'es'));
+  }
+  function textoPedido(nombre, filas, nota) {
+    const p = provPorNombre(nombre);
+    return 'Hola' + (p && p.contacto ? ' ' + p.contacto.split(' ')[0] : '') + ', le comparto el pedido de ' + (db.empresa.nombre || 'CIVIZO') + (nota ? ' (' + nota + ')' : '') + ':\n'
+      + filas.map(f => '• ' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + C.nombreUnidad(f.unidadCompra) + ' de ' + f.nombre).join('\n')
+      + '\n\nTotal estimado: ' + dinero(filas.reduce((s, f) => s + f.costoCompra, 0)) + '\n¡Gracias!';
+  }
+  function modalPedidos(lista, nota) {
+    const grupos = gruposPorProveedor(lista);
+    if (!grupos.length) return aviso('No hay insumos por comprar', true);
+    const cuerpo = grupos.map(([nombre, filas], k) => {
+      const p = provPorNombre(nombre), total = filas.reduce((s, f) => s + f.costoCompra, 0);
+      const wa = p && waDe(p.whatsapp || p.telefono);
+      const min = p && C.num(p.pedidoMinimo);
+      return '<section class="panel pedido"><div class="panel-cab"><div><h2>' + esc(nombre) + '</h2><p>' + filas.length + ' insumo' + (filas.length === 1 ? '' : 's') + ' · ' + dinero(total) + (p && p.entrega ? ' · entrega ' + esc(p.entrega) : '') + '</p></div>'
+        + '<div class="acciones">' + (nombre !== 'Sin proveedor' ? '<button type="button" class="btn chico" data-ped="orden" data-k="' + k + '">' + ico('imprimir') + 'Orden de compra</button><button type="button" class="btn chico" data-ped="copiar" data-k="' + k + '">' + ico('copiar') + 'Copiar</button>' : '') + (wa ? '<a class="btn chico primario" href="https://wa.me/' + wa + '?text=' + encodeURIComponent(textoPedido(nombre, filas, nota)) + '" target="_blank" rel="noopener">' + ico('chat') + 'WhatsApp</a>' : '') + '</div></div>'
+        + (min && total < min ? '<div class="nota alerta">El pedido mínimo de este proveedor es ' + dinero(min) + '.</div>' : '')
+        + (nombre === 'Sin proveedor' ? '<div class="nota">Estos insumos no tienen proveedor. Asígnalo en "Dónde se cotizó" de cada insumo.</div>' : '')
+        + '<div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Comprar</th><th class="num">Costo</th></tr></thead><tbody>' + filas.map(f => '<tr><td>' + esc(f.nombre) + '</td><td class="num">' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + esc(C.nombreUnidad(f.unidadCompra)) + '</td><td class="num">' + dinero(f.costoCompra) + '</td></tr>').join('') + '</tbody></table></div></section>';
+    }).join('');
+    abrirModal({
+      titulo: 'Pedidos por proveedor', ancho: true, cuerpo: (nota ? '<p class="tenue">' + esc(nota) + '</p>' : '') + cuerpo,
+      alAbrir: c => c.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-ped]'); if (!b) return;
+        const [nombre, filas] = grupos[+b.dataset.k];
+        if (b.dataset.ped === 'orden') imprimir(docOrdenCompra(nombre, filas, nota));
+        else { const t = textoPedido(nombre, filas, nota); (navigator.clipboard ? navigator.clipboard.writeText(t) : Promise.reject()).then(() => aviso('Pedido copiado: pégalo en WhatsApp o correo')).catch(() => aviso('No se pudo copiar', true)); }
+      })
+    });
+  }
+  function docOrdenCompra(nombre, filas, nota) {
+    const p = provPorNombre(nombre) || {};
+    const total = filas.reduce((s, f) => s + f.costoCompra, 0);
+    const hoy = new Date(), folio = 'OC-' + String(hoy.getDate()).padStart(2, '0') + String(hoy.getMonth() + 1).padStart(2, '0') + String(hoy.getFullYear()).slice(2) + '-' + norm(nombre).replace(/[^a-z0-9]/g, '').slice(0, 4).toUpperCase();
+    return encabezadoDoc('Orden de compra', '<div><b>' + folio + '</b></div><div>Fecha: ' + fechaCorta(hoyISO()) + '</div>')
+      + '<div class="datos"><div><b>Proveedor:</b> ' + esc(nombre) + '</div><div><b>Contacto:</b> ' + esc([p.contacto, p.telefono || p.whatsapp].filter(Boolean).join(' · ') || '—') + '</div>'
+      + '<div><b>Forma de pago:</b> ' + esc(p.pago === 'Crédito' && C.num(p.diasCredito) ? 'Crédito a ' + C.num(p.diasCredito) + ' días' : p.pago || 'Contado') + '</div><div><b>Entrega:</b> ' + esc(p.entrega || 'Por confirmar') + '</div>'
+      + (nota ? '<div><b>Para:</b> ' + esc(nota) + '</div>' : '') + '</div>'
+      + '<h2>Productos</h2><table><thead><tr><th></th><th>Producto</th><th class="num">Cantidad</th><th class="num">Precio de referencia</th><th class="num">Importe</th></tr></thead><tbody>'
+      + filas.map(f => '<tr><td><span class="check"></span></td><td>' + esc(f.nombre) + '</td><td class="num">' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + esc(C.nombreUnidad(f.unidadCompra)) + '</td><td class="num">' + dinero(f.empaquesCompra ? f.costoCompra / f.empaquesCompra : 0) + '</td><td class="num">' + dinero(f.costoCompra) + '</td></tr>').join('')
+      + '</tbody></table><div class="totales"><div class="gran"><span>Total estimado</span><span>' + dinero(total) + '</span></div></div>'
+      + '<p class="tenue" style="margin-top:10px;font-size:8.5pt">Precios de referencia según la última cotización registrada; confirmar al surtir.</p>'
+      + '<div class="firmas"><div>Solicita · ' + esc(db.empresa.responsable || db.empresa.nombre) + '</div><div>Recibe · ' + esc(p.contacto || nombre) + '</div></div>' + pieDoc();
   }
 
   /* ================================================================ COBRANZA
@@ -2010,7 +2227,7 @@
       }),
       cargarEjemplo: () => confirmar('Cargar datos de ejemplo', 'Se agregarán los insumos, recetas, servicios y el evento de ejemplo a tu información actual.', 'Agregar', () => {
         const ej = D.ejemplo();
-        ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); ej[k].forEach(x => { if (!ids.has(x.id)) db[k].push(x); }); });
+        ['insumos', 'recetas', 'servicios', 'eventos', 'proveedores'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); ej[k].forEach(x => { if (!ids.has(x.id)) db[k].push(x); }); });
         cambioEstructura(); aviso('Datos de ejemplo agregados'); render();
       }),
       subirLocal: () => confirmar('Subir a la nube', 'Se agregarán a la nube los insumos, recetas, servicios y eventos guardados en este navegador que todavía no estén en ella. No se borra nada.', 'Subir', subirDatosLocales),
