@@ -373,10 +373,10 @@
   }
 
   /** Explosión completa de un evento (todas sus líneas). */
-  function explotarEvento(ev, db) {
+  function explotarEvento(ev, db, acc) {
     const ix = idx(db);
     const pax = num(ev && ev.personas);
-    const acc = nuevoAcumulado();
+    acc = acc || nuevoAcumulado();
     (ev && ev.lineas || []).forEach(l => {
       const cant = l.cantidad === '' || l.cantidad == null ? pax : num(l.cantidad);
       if (l.tipo === 'servicio') explotarServicio(ix.servicios.get(l.refId), cant, ix, acc);

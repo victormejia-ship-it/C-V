@@ -12,12 +12,15 @@ marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 
 | Módulo | Para qué sirve |
 | --- | --- |
+| **Inicio** | Página general tipo ERP: buscador de toda la plataforma, acciones rápidas y cada módulo con su dato clave (eventos abiertos, recetas, insumos sin precio, eventos por surtir). |
 | **Tablero** | Cotizado en curso, eventos aprobados, próximos eventos, pendientes (insumos sin precio, recetas con food cost alto o con errores) y escalado rápido de cualquier receta. |
 | **Insumos** | Catálogo de compras: presentación (1 kg, 20 L, paquete de 50 pza), precio, **rendimiento / merma** y proveedor. Calcula el costo neto aprovechable. Importa y exporta CSV para actualizar precios en bloque. |
 | **Recetas** | Recetas estandarizadas con código `REC-001`, porciones base, tamaño de porción, ingredientes en cantidades netas, procedimiento paso a paso, alérgenos y puntos críticos. Una receta con rendimiento (ej. *1 L de salsa verde*) se puede usar como **sub-receta** dentro de otras. Muestra costo por porción, precio sugerido por food cost y food cost real. |
 | **Escalador** | En cada receta: ¿cuánto necesitas producir? En porciones (1, 10, 100, 1,000…) o en volumen/peso (ej. 20 L). Da cantidades netas, lo que hay que surtir con merma, costo de producción, **orden de producción** imprimible y **lista de compras**. |
 | **Servicios** | El catálogo de lo que vendes, organizado por las 5 líneas de servicio de la marca (Alimentación Empresarial, Catering y Eventos, Producción de Alimentos, Operación de Cocinas, Proyectos y Consultoría). Cada servicio se arma con recetas (porciones por persona) e insumos directos (desechables, pan) y se costea por persona con su margen. Simulador para N personas. |
 | **Eventos** | Cotización completa con folio `CVZ-DDMMAA-NN`: menú (servicios o recetas), personal por horas, logística, indirectos, margen, descuento e IVA. Muestra **costo interno vs. cotización cliente**, utilidad, food cost y precio por persona. Genera cotización para el cliente, hoja de costo interno y **producción y compras** del evento completo (explosión de todas las recetas y sub-recetas). |
+| **Producción y compras** | Lista de compras y preparaciones consolidadas de todos los eventos de un periodo, filtrando por estatus y eligiendo eventos. |
+| **Usuarios** | Solo con Firebase: cuentas, roles (Dueño, Administrador, Editor, Consulta) y solicitudes de acceso. |
 | **Ajustes** | Datos de la empresa para los documentos, IVA / margen / food cost / indirectos por omisión, modo claro u oscuro, respaldo y restauración JSON. |
 
 ## Cómo se calcula
@@ -38,6 +41,12 @@ pruebas: `node tests/prueba_costeo.js`.
 
 ## Dónde se guarda la información
 
+**Con Firebase (varios usuarios):** al llenar `js/config.js` pide correo y
+contraseña y guarda todo en Firestore. Pasos en [docs/FIREBASE.md](docs/FIREBASE.md).
+Seguridad en [config/firestore.rules](config/firestore.rules).
+
+**Modo local (sin configurar):**
+
 En el navegador del equipo donde se captura (`localStorage`). En **Ajustes →
 Descargar respaldo** se baja todo en un JSON, y **Restaurar respaldo** lo
 carga en otra computadora. Al abrirla por primera vez trae datos de
@@ -49,10 +58,14 @@ ejemplo; se borran con un botón y lo tuyo se queda.
 ```
 index.html          Página
 css/civizo.css      Estilos con la paleta de marca (claro / oscuro / impresión)
+js/config.js        Datos del proyecto de Firebase (vacío = modo local)
+js/nube.js          Acceso, cuentas y sincronización con Firestore (REST)
 js/costeo.js        Motor de costeo, escalado y explosión de insumos
 js/datos.js         Almacenamiento, folios y datos de ejemplo
 js/app.js           Interfaz, documentos imprimibles y CSV
 assets/marca/       Logotipos, isotipos y guía de marca CIVIZO
+config/             Reglas de seguridad de Firestore
+docs/FIREBASE.md    Cómo crear y conectar el proyecto de Firebase
 tests/              Pruebas del motor (Node, sin dependencias)
 ```
 
@@ -63,8 +76,6 @@ Firebase Hosting (`firebase deploy --only hosting`). No requiere compilación.
 
 ## Siguientes pasos sugeridos
 
-- Modo servidor con Firebase (cuentas, varios usuarios viendo lo mismo), como
-  en Forguard / Profectus.
 - Historial de precios por insumo y comparativo entre proveedores.
 - Fotos de montaje en la ficha técnica.
 - Tabla nutrimental por receta.
