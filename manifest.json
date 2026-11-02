@@ -1,0 +1,11 @@
+{
+  "name": "CIVIZO Cocina",
+  "short_name": "CIVIZO",
+  "description": "Costeo de servicios de alimentos y eventos, recetas estandarizadas y escalado de producción.",
+  "lang": "es-MX",
+  "start_url": "./",
+  "display": "standalone",
+  "background_color": "#2B2B2B",
+  "theme_color": "#2B2B2B",
+  "icons": [{ "src": "assets/marca/favicon.png", "sizes": "256x111", "type": "image/png" }]
+}

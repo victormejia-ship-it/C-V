@@ -1,0 +1,11 @@
+CIVIZO — GUÍA DE IDENTIDAD VISUAL
+
+Nombre: C (Cindy) + I (Iker) + V (Víctor) + I (Miguel, en Víctor Miguel) + ZO (Zoe).
+Símbolo: cinco figuras humanas geométricas conectadas por un arco. Figura central naranja como punto focal, no jerarquía familiar.
+Paleta: carbón #2B2B2B; naranja #F26522; gris #8A8A8A; blanco #F5F5F5.
+Tipografía sugerida: Montserrat para títulos; Poppins para textos. Fuentes no incluidas; revisar licencias al instalarlas.
+Usos: logotipo completo para comunicación principal; isotipo para iconos, bordados y sellos.
+Conservar proporciones, evitar distorsiones, no alterar los colores de marca.
+Los SVG son vectoriales y editables. Los PNG/JPG/WEBP se exportaron a partir de los mismos SVG.
+Nota: esta es una interpretación vectorial simplificada y consistente de la presentación conceptual, no una reproducción idéntica.
+Antes de uso comercial: verificar disponibilidad y registro ante IMPI. No se afirma registro de marca.
