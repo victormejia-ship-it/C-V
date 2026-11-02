@@ -39,6 +39,15 @@ jobs:
           fi
           printf '%s' "$SA" > "$RUNNER_TEMP/sa.json"
           echo "GOOGLE_APPLICATION_CREDENTIALS=$RUNNER_TEMP/sa.json" >> "$GITHUB_ENV"
+          # Solo datos públicos de la llave (nunca la llave privada), para revisar permisos.
+          proyecto_llave=$(jq -r '.project_id // "?"' "$RUNNER_TEMP/sa.json")
+          cuenta_llave=$(jq -r '.client_email // "?"' "$RUNNER_TEMP/sa.json")
+          echo "Llave del proyecto: $proyecto_llave"
+          echo "Cuenta de servicio: $cuenta_llave"
+          if [ "$proyecto_llave" != "$PROYECTO" ]; then
+            echo "::error::La llave es del proyecto '$proyecto_llave', no de '$PROYECTO'. Genera la llave en el proyecto $PROYECTO."
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
