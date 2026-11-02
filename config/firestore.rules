@@ -1,0 +1,70 @@
+rules_version = '2';
+
+/* ===========================================================================
+   Reglas de seguridad de CIVIZO Cocina
+
+   Publicar: consola de Firebase → Firestore Database → Reglas → pegar este
+   archivo → Publicar.  (o: firebase deploy --only firestore:rules)
+
+   Roles
+     owner     Dueño: todo. Lo obtiene la PRIMERA cuenta que se registra.
+     admin     Todo, incluidas cuentas y ajustes (no puede tocar al dueño).
+     editor    Lee y modifica insumos, recetas, servicios y eventos.
+     consulta  Solo lee.
+   Las cuentas nuevas nacen como "consulta" sin acceso (activo = false)
+   hasta que un dueño o administrador las aprueba.
+   =========================================================================== */
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function rutaPerfil() { return /databases/$(database)/documents/usuarios/$(request.auth.uid); }
+    function perfil() { return get(rutaPerfil()).data; }
+    function conAcceso() { return request.auth != null && exists(rutaPerfil()) && perfil().activo == true; }
+    function rol() { return perfil().rol; }
+    function esOwner() { return conAcceso() && rol() == 'owner'; }
+    function esAdmin() { return conAcceso() && rol() in ['owner', 'admin']; }
+    function puedeEditar() { return conAcceso() && rol() in ['owner', 'admin', 'editor']; }
+    function rutaArranque() { return /databases/$(database)/documents/sistema/arranque; }
+
+    match /usuarios/{uid} {
+      allow read: if (request.auth != null && request.auth.uid == uid) || esAdmin();
+
+      // Solicitud propia (sin acceso) o arranque del dueño en el mismo commit.
+      allow create: if request.auth != null && request.auth.uid == uid
+        && request.resource.data.correo == request.auth.token.email
+        && (
+          (request.resource.data.rol == 'consulta' && request.resource.data.activo == false)
+          || (request.resource.data.rol == 'owner' && request.resource.data.activo == true
+              && !exists(rutaArranque()) && existsAfter(rutaArranque()))
+        );
+
+      // El propio usuario solo actualiza su último acceso y su nombre.
+      allow update: if (request.auth != null && request.auth.uid == uid && conAcceso()
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['ultimoAcceso', 'nombre']))
+        // Admin: cualquier cuenta que no sea dueño, y sin nombrar dueños.
+        || (esAdmin() && resource.data.rol != 'owner' && request.resource.data.rol != 'owner')
+        // Dueño: cualquier cuenta menos quitarse a sí mismo.
+        || (esOwner() && request.auth.uid != uid);
+
+      allow delete: if (esAdmin() && resource.data.rol != 'owner' && request.auth.uid != uid) || (esOwner() && request.auth.uid != uid);
+    }
+
+    match /sistema/arranque {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && !exists(rutaArranque())
+        && request.resource.data.uid == request.auth.uid
+        && getAfter(rutaPerfil()).data.rol == 'owner';
+      allow update, delete: if false;
+    }
+
+    match /sistema/config {
+      allow read: if conAcceso();
+      allow write: if esAdmin();
+    }
+
+    match /{col}/{id} {
+      allow read: if conAcceso() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados'];
+      allow write: if puedeEditar() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados'];
+    }
+  }
+}

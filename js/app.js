@@ -36,17 +36,24 @@
   const copia = o => JSON.parse(JSON.stringify(o));
 
   /* ------------------------------------------------------------ Estado */
-  const carga = D.cargar();
-  let db = carga.datos;
+  const N = window.Nube;
+  const NUBE = !!(N && N.HAY_NUBE);
+  let db, perfil = null;
+  if (NUBE) db = D.vacio();
+  else { const carga = D.cargar(); db = carga.datos; if (carga.nuevo) D.guardar(db); }
   let IX = C.crearIndice(db);
-  if (carga.nuevo) D.guardar(db);
   let ctx = {};
+  /* Permisos: en modo local todo se puede; en la nube depende del rol. */
+  const rol = () => NUBE ? (perfil && perfil.rol) || 'consulta' : 'owner';
+  const esAdmin = () => ['owner', 'admin'].includes(rol());
+  const puedeEditar = () => ['owner', 'admin', 'editor'].includes(rol());
   const escalas = {};          // por receta: { valor, modo }
   const filtros = { insumos: { q: '', cat: '' }, recetas: { q: '', cat: '', tipo: '' }, servicios: { linea: '' }, eventos: { q: '', est: '' } };
 
   function reindexar() { IX = C.crearIndice(db); }
   let tGuardar = null;
   function guardar(inmediato) {
+    if (NUBE) { if (perfil && puedeEditar()) N.programar(db); return; }
     clearTimeout(tGuardar);
     const hacer = () => {
       const ok = D.guardar(db);
@@ -78,16 +85,27 @@
     lista: '<path d="M9 6h11M9 12h11M9 18h11"/><path d="M4 6h.01M4 12h.01M4 18h.01"/>',
     bajar: '<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>',
     subir: '<path d="M12 20V9M7 14l5-5 5 5M4 4h16"/>',
-    escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>'
+    escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>',
+    tablero: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+    compras: '<path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
+    usuarios: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/>',
+    salir: '<path d="M15 4h4a1 1 0 0 1 1 1v14a1 1 0 0 1-1 1h-4"/><path d="M10 16l-4-4 4-4M6 12h10"/>',
+    buscar: '<circle cx="11" cy="11" r="6.5"/><path d="M20 20l-4.2-4.2"/>',
+    inventario: '<path d="M3 7l9-4 9 4v10l-9 4-9-4V7z"/><path d="M3 7l9 4 9-4M12 11v10"/>',
+    proveedores: '<path d="M3 16V6h11v10M14 9h4l3 3v4h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+    facturacion: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6M9 16h3"/>'
   };
   const ico = (k, cls) => '<svg viewBox="0 0 24 24"' + (cls ? ' class="' + cls + '"' : '') + ' aria-hidden="true">' + (ICO[k] || '') + '</svg>';
   const ISOTIPO = document.querySelector('.isotipo').outerHTML;
 
-  const MENU = [
-    ['inicio', 'Tablero'], ['eventos', 'Eventos'], ['servicios', 'Servicios'], ['recetas', 'Recetas'], ['insumos', 'Insumos'], ['ajustes', 'Ajustes']
-  ];
+  function menu() {
+    const m = [['inicio', 'Inicio'], ['tablero', 'Tablero'], ['eventos', 'Eventos'], ['servicios', 'Servicios'], ['recetas', 'Recetas'], ['insumos', 'Insumos'], ['compras', 'Compras']];
+    if (NUBE && esAdmin()) m.push(['usuarios', 'Usuarios']);
+    if (esAdmin()) m.push(['ajustes', 'Ajustes']);
+    return m;
+  }
   function pintarMenu(activo) {
-    $('menu').innerHTML = MENU.map(([k, t]) => '<a href="#' + k + '" class="' + (k === activo ? 'activo' : '') + '"' + (k === activo ? ' aria-current="page"' : '') + '>' + ico(k) + '<span>' + t + '</span></a>').join('');
+    $('menu').innerHTML = menu().map(([k, t]) => '<a href="#' + k + '" class="' + (k === activo ? 'activo' : '') + '"' + (k === activo ? ' aria-current="page"' : '') + '>' + ico(k) + '<span>' + t + '</span></a>').join('');
   }
 
   /* ------------------------------------------------------------ Avisos */
@@ -136,7 +154,10 @@
   let rutaPrevia = '';
   function render() {
     const r = ruta();
-    const vistas = { inicio: vInicio, insumos: vInsumos, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, ajustes: vAjustes };
+    if (NUBE && !perfil) return;
+    const vistas = { inicio: vInicio, tablero: vTablero, insumos: vInsumos, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios };
+    if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; }
+    if (!NUBE) delete vistas.usuarios;
     const f = vistas[r.vista] || vInicio;
     const menuActivo = { receta: 'recetas', servicio: 'servicios', evento: 'eventos' }[r.vista] || (vistas[r.vista] ? r.vista : 'inicio');
     pintarMenu(menuActivo);
@@ -145,6 +166,7 @@
     rutaPrevia = location.hash;
     $('vista').innerHTML = '<div class="contenido">' + f(r.id) + '</div>';
     if (ctx.alPintar) ctx.alPintar();
+    if (!puedeEditar()) aplicarSoloLectura();
     if (cambio) { window.scrollTo(0, 0); }
     const t = document.querySelector('.contenido h1');
     document.title = (t ? t.textContent + ' · ' : '') + 'CIVIZO Cocina';
@@ -254,7 +276,7 @@
   const sortNombre = (a, b) => String(a.nombre).localeCompare(String(b.nombre), 'es');
 
   /* ================================================================ INICIO */
-  function vInicio() {
+  function vTablero() {
     const p = db.parametros;
     const enCurso = db.eventos.filter(e => ['borrador', 'enviada', 'aprobada'].includes(e.estatus));
     const cot = e => C.cotizarEvento(e, IX);
@@ -297,7 +319,7 @@
       }
     };
 
-    return '<div class="cabecera"><div><span class="ceja">Tablero</span><h1>' + (db.empresa.responsable ? 'Hola, ' + esc(db.empresa.responsable.split(' ')[0]) : 'Tu cocina en números') + '</h1><p class="sub">Costea tus servicios, estandariza recetas y cotiza eventos desde un mismo lugar.</p></div>'
+    return '<div class="cabecera"><div><span class="ceja">Tablero</span><h1>Tu cocina en números</h1><p class="sub">Costea tus servicios, estandariza recetas y cotiza eventos desde un mismo lugar.</p></div>'
       + '<div class="acciones"><button class="btn" data-accion="nuevaReceta">' + ico('mas') + 'Nueva receta</button><button class="btn primario" data-accion="nuevoEvento">' + ico('mas') + 'Nuevo evento</button></div></div>'
       + bannerEjemplo()
       + '<div class="metricas">'
@@ -384,7 +406,8 @@
       precio: C.num(cuerpo.querySelector('#mi-precio').value), rendimiento: C.num(cuerpo.querySelector('#mi-rend').value) || 100
     });
     const botones = [];
-    if (existente) botones.push({ texto: ico('borrar') + 'Eliminar', clase: 'peligro izq', accion: () => { eliminarInsumo(id); } });
+    const soloVer = !puedeEditar();
+    if (existente && !soloVer) botones.push({ texto: ico('borrar') + 'Eliminar', clase: 'peligro izq', accion: () => { eliminarInsumo(id); } });
     botones.push({ texto: 'Cancelar', clase: 'fantasma' });
     botones.push({
       texto: existente ? 'Guardar cambios' : 'Agregar insumo', clase: 'primario', accion: cuerpo => {
@@ -410,8 +433,9 @@
       }
     });
     abrirModal({
-      titulo: existente ? 'Editar insumo' : 'Nuevo insumo', cuerpo: formInsumo(ins), botones,
+      titulo: soloVer ? 'Insumo' : existente ? 'Editar insumo' : 'Nuevo insumo', cuerpo: formInsumo(ins), botones: soloVer ? [{ texto: 'Cerrar', clase: 'primario' }] : botones,
       alAbrir: cuerpo => {
+        if (soloVer) cuerpo.querySelectorAll('input, select').forEach(x => { x.disabled = true; });
         const calc = () => {
           const v = leer(cuerpo);
           const dim = C.dimension(v.unidadCompra), f = dim === 'pieza' ? 1 : 1000, un = dim === 'masa' ? 'kg' : dim === 'volumen' ? 'L' : 'pza';
@@ -904,6 +928,326 @@
     });
   }
 
+  /* ================================================================ INICIO (ERP) */
+  const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
+  const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function vInicio() {
+    const hoy = new Date();
+    const nombre = (perfil && perfil.nombre) || db.empresa.responsable || '';
+    const abiertos = db.eventos.filter(e => ['borrador', 'enviada', 'aprobada'].includes(e.estatus));
+    const montoAbierto = abiertos.reduce((s, e) => s + C.cotizarEvento(e, IX).total, 0);
+    const porSurtir = eventosPorSurtir().length;
+    const sinPrecio = db.insumos.filter(i => !(C.num(i.precio) > 0)).length;
+    const bases = db.recetas.filter(r => C.rendimientoBase(r)).length;
+    const pendientesTablero = db.recetas.filter(r => C.costoReceta(r, IX).error).length + (sinPrecio ? 1 : 0);
+    const mod = (href, k, titulo, desc, dato, accion) => '<a class="modulo" href="' + href + '"' + (accion ? ' data-accion="' + accion + '"' : '') + '><span class="modulo-ico">' + ico(k) + '</span><span class="modulo-txt"><b>' + titulo + '</b><span>' + desc + '</span></span><span class="modulo-dato">' + dato + '</span></a>';
+    const prox = (k, titulo, desc) => '<div class="modulo proximo" aria-disabled="true"><span class="modulo-ico">' + ico(k) + '</span><span class="modulo-txt"><b>' + titulo + '</b><span>' + desc + '</span></span><span class="modulo-dato"><span class="pill">Próximamente</span></span></div>';
+    const grupo = (titulo, tiles) => '<section class="grupo-mod"><h2 class="ceja">' + titulo + '</h2><div class="modulos">' + tiles.join('') + '</div></section>';
+
+    const admin = [mod('#tablero', 'tablero', 'Tablero', 'Indicadores, próximos eventos y pendientes', pendientesTablero ? '<span class="pill alerta">' + pendientesTablero + ' pendiente' + (pendientesTablero > 1 ? 's' : '') + '</span>' : '<span class="pill ok">Al día</span>')];
+    if (NUBE && esAdmin()) admin.push(mod('#usuarios', 'usuarios', 'Usuarios', 'Cuentas, roles y solicitudes de acceso', 'Equipo'));
+    if (esAdmin()) admin.push(mod('#ajustes', 'ajustes', 'Ajustes', 'Empresa, IVA, márgenes y respaldos', NUBE ? 'En la nube' : 'Este equipo'));
+
+    ctx.acciones = {
+      abrirEscalador: () => abrirEscaladorRapido(),
+      irBusca: d => { if (d.tipo === 'insumo') abrirInsumo(d.id); else ir(d.h); }
+    };
+    ctx.alPintar = () => {
+      const inp = $('buscaGlobal');
+      inp.addEventListener('input', () => { $('resBusca').innerHTML = resultadosBusqueda(inp.value); });
+      inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { const p = $('resBusca').querySelector('[data-accion]'); if (p) p.click(); } });
+    };
+    const rapidas = puedeEditar()
+      ? '<button class="btn primario" data-accion="nuevoEvento">' + ico('mas') + 'Nuevo evento</button><button class="btn" data-accion="nuevaReceta">' + ico('mas') + 'Nueva receta</button><button class="btn" data-accion="nuevoInsumo">' + ico('mas') + 'Nuevo insumo</button><button class="btn" data-accion="nuevoServicio">' + ico('mas') + 'Nuevo servicio</button>'
+      : '';
+    return '<div class="bienvenida"><span class="ceja">' + DIAS[hoy.getDay()] + ' ' + hoy.getDate() + ' de ' + MESES_L[hoy.getMonth()] + '</span>'
+      + '<h1>' + (nombre ? 'Hola, ' + esc(nombre.split(' ')[0]) : 'Bienvenido a ' + esc(db.empresa.nombre || 'CIVIZO')) + '</h1><p class="sub">¿Qué quieres hacer hoy?</p>'
+      + '<div class="buscador"><span class="buscador-ico">' + ico('buscar') + '</span><input type="search" id="buscaGlobal" placeholder="Buscar receta, insumo, servicio, evento o cliente" autocomplete="off" aria-label="Buscar en toda la plataforma"><div class="resultados" id="resBusca"></div></div>'
+      + '<div class="acciones">' + rapidas + '<button class="btn" data-accion="abrirEscalador">' + ico('escalar') + 'Escalar receta</button></div></div>'
+      + bannerEjemplo()
+      + grupo('Ventas y servicio', [
+        mod('#eventos', 'eventos', 'Eventos y cotizaciones', 'Cotiza con costo interno, utilidad y precio por persona', '<b>' + abiertos.length + '</b> abierto' + (abiertos.length === 1 ? '' : 's') + ' · ' + dinero(montoAbierto)),
+        mod('#servicios', 'servicios', 'Servicios', 'Tu catálogo por línea de negocio, costeado por persona', '<b>' + db.servicios.length + '</b> en catálogo')
+      ])
+      + grupo('Cocina y producción', [
+        mod('#recetas', 'recetas', 'Recetas estandarizadas', 'Fichas técnicas con costo, procedimiento y alérgenos', '<b>' + db.recetas.length + '</b> recetas · ' + bases + ' bases'),
+        mod('#recetas', 'escalar', 'Escalador', 'Cantidades y costo para 1 o para 1,000 porciones', 'Calcular', 'abrirEscalador'),
+        mod('#compras', 'compras', 'Producción y compras', 'Lista de compras consolidada de tus próximos eventos', '<b>' + porSurtir + '</b> evento' + (porSurtir === 1 ? '' : 's') + ' por surtir'),
+        mod('#insumos', 'insumos', 'Insumos', 'Precios, presentaciones, merma y proveedores', '<b>' + db.insumos.length + '</b>' + (sinPrecio ? ' · <span class="pill alerta">' + sinPrecio + ' sin precio</span>' : ''))
+      ])
+      + grupo('Administración', admin)
+      + grupo('En camino', [prox('inventario', 'Inventario', 'Existencias, entradas y salidas de almacén'), prox('proveedores', 'Proveedores', 'Comparativo de precios e historial de compras'), prox('facturacion', 'Cobranza', 'Anticipos, saldos y facturas por evento')]);
+  }
+  function resultadosBusqueda(q) {
+    q = norm(q);
+    if (q.length < 2) return '';
+    const res = [];
+    db.eventos.forEach(e => { if (norm([e.nombre, e.cliente, e.folio, e.lugar].join(' ')).includes(q)) res.push(['Evento', esc(e.nombre || e.folio) + ' <span class="tenue">' + esc(e.cliente || '') + ' · ' + fechaCorta(e.fecha) + '</span>', 'data-h="#evento-' + e.id + '"']); });
+    db.recetas.forEach(r => { if (norm(r.nombre + ' ' + r.codigo).includes(q)) res.push(['Receta', esc(r.nombre) + ' <span class="tenue">' + esc(r.codigo) + '</span>', 'data-h="#receta-' + r.id + '"']); });
+    db.servicios.forEach(s => { if (norm(s.nombre).includes(q)) res.push(['Servicio', esc(s.nombre) + ' <span class="tenue">' + esc(nombreLinea(s.linea)) + '</span>', 'data-h="#servicio-' + s.id + '"']); });
+    db.insumos.forEach(i => { if (norm(i.nombre + ' ' + (i.proveedor || '')).includes(q)) res.push(['Insumo', esc(i.nombre) + ' <span class="tenue">' + costoNetoTexto(i) + '</span>', 'data-tipo="insumo" data-id="' + i.id + '"']); });
+    if (!res.length) return '<div class="res-vacio">Sin resultados para esa búsqueda.</div>';
+    return res.slice(0, 10).map(r => '<button type="button" class="res" data-accion="irBusca" ' + r[2] + '><span class="pill">' + r[0] + '</span><span>' + r[1] + '</span></button>').join('');
+  }
+  function abrirEscaladorRapido() {
+    if (!db.recetas.length) return aviso('Primero crea una receta', true);
+    abrirModal({
+      titulo: 'Escalar una receta',
+      cuerpo: '<div class="campos"><label class="campo ancho"><span>Receta</span><select id="erReceta">' + db.recetas.slice().sort(sortNombre).map(r => '<option value="' + r.id + '">' + esc(r.nombre) + '</option>').join('') + '</select></label><label class="campo"><span>Porciones</span><input id="erPorc" type="text" inputmode="decimal" value="100"></label></div><p class="tenue">Te llevamos a la receta con las cantidades, el costo, la orden de producción y la lista de compras.</p>',
+      botones: [{ texto: 'Cancelar', clase: 'fantasma' }, { texto: 'Calcular', clase: 'primario', accion: c => { const id = c.querySelector('#erReceta').value, v = C.num(c.querySelector('#erPorc').value); escalas[id] = { valor: v > 0 ? v : 100, modo: 'porc' }; setTimeout(() => ir('#receta-' + id), 0); } }]
+    });
+  }
+
+  /* ================================================================ COMPRAS */
+  const estadoCompras = { desde: '', hasta: '', est: ['aprobada', 'enviada'], fuera: [] };
+  function eventosPorSurtir() {
+    const e = estadoCompras;
+    const desde = e.desde || hoyISO();
+    const hasta = e.hasta || (() => { const d = new Date(Date.now() + 30 * 864e5); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); return d.toISOString().slice(0, 10); })();
+    return db.eventos.filter(x => e.est.includes(x.estatus) && x.fecha && x.fecha >= desde && x.fecha <= hasta).sort((a, b) => a.fecha.localeCompare(b.fecha));
+  }
+  function prepsDe(acc) {
+    const preps = [];
+    acc.subrecetas.forEach((porc, id) => { const r = IX.recetas.get(id); if (r) preps.push({ r, porc, base: true }); });
+    acc.recetas.forEach((porc, id) => { const r = IX.recetas.get(id); if (r) preps.push({ r, porc, base: false }); });
+    return preps.sort((a, b) => (b.base - a.base) || sortNombre(a.r, b.r));
+  }
+  function csvCompras(lista) {
+    return csv([['insumo', 'categoria', 'proveedor', 'neto', 'bruto', 'unidad', 'empaques', 'presentacion', 'costo']].concat(lista.map(f => {
+      const l = C.legible(f.brutaBase, f.dim), ln = C.legible(f.netaBase, f.dim);
+      return [f.nombre, f.categoria, f.proveedor, C.r2(C.convertir(ln.cant, ln.u, l.u)), C.r2(l.cant), C.nombreUnidad(l.u), f.empaquesCompra, f.presentacion + ' ' + C.nombreUnidad(f.unidadCompra), C.r2(f.costoCompra)];
+    })));
+  }
+  function vCompras() {
+    const e = estadoCompras;
+    if (!e.desde) e.desde = hoyISO();
+    if (!e.hasta) { const d = new Date(Date.now() + 30 * 864e5); d.setMinutes(d.getMinutes() - d.getTimezoneOffset()); e.hasta = d.toISOString().slice(0, 10); }
+    const eventos = eventosPorSurtir();
+    const elegidos = eventos.filter(x => !e.fuera.includes(x.id));
+    const acc = C.nuevoAcumulado();
+    elegidos.forEach(x => C.explotarEvento(x, IX, acc));
+    const lista = C.listaCompras(acc, IX);
+    const preps = prepsDe(acc);
+    const total = lista.reduce((s, f) => s + f.costoCompra, 0);
+    const pax = elegidos.reduce((s, x) => s + C.num(x.personas), 0);
+    const porCat = {};
+    lista.forEach(f => { (porCat[f.categoria] = porCat[f.categoria] || []).push(f); });
+    const titulo = 'Compras del ' + fechaCorta(e.desde) + ' al ' + fechaCorta(e.hasta) + ' · ' + elegidos.length + ' evento' + (elegidos.length === 1 ? '' : 's');
+
+    ctx.acciones = {
+      alternarEvento: d => { const i = e.fuera.indexOf(d.id); if (i >= 0) e.fuera.splice(i, 1); else e.fuera.push(d.id); render(); },
+      imprimirCompras: () => imprimir(docProduccion(titulo, lista, preps, null)),
+      csvCompras: () => descargar('compras-' + e.desde + '-a-' + e.hasta + '.csv', csvCompras(lista), 'text/csv')
+    };
+    ctx.alPintar = () => {
+      $('cDesde').addEventListener('change', ev => { e.desde = ev.target.value; render(); });
+      $('cHasta').addEventListener('change', ev => { e.hasta = ev.target.value; render(); });
+      document.querySelectorAll('[data-est]').forEach(ch => ch.addEventListener('change', () => { e.est = Array.from(document.querySelectorAll('[data-est]:checked')).map(x => x.value); render(); }));
+    };
+    return '<div class="cabecera"><div><span class="ceja">Cocina y producción</span><h1>Producción y compras</h1><p class="sub">Junta todo lo que hay que preparar y comprar para los eventos de un periodo. Cada receta y sub-receta se escala y se suma con su merma.</p></div>'
+      + '<div class="acciones"><button class="btn" data-accion="csvCompras">' + ico('bajar') + 'Descargar CSV</button><button class="btn primario" data-accion="imprimirCompras">' + ico('imprimir') + 'Imprimir</button></div></div>'
+      + '<div class="rejilla r-lateral"><div class="rejilla">'
+      + '<div class="metricas"><div class="metrica destacada"><span class="et">Compra estimada</span><span class="val">' + dinero(total) + '</span><span class="det">empaques completos</span></div><div class="metrica"><span class="et">Eventos</span><span class="val">' + elegidos.length + '</span><span class="det">de ' + eventos.length + ' en el periodo</span></div><div class="metrica"><span class="et">Personas</span><span class="val">' + n0(pax) + '</span><span class="det">a atender</span></div><div class="metrica"><span class="et">Insumos</span><span class="val">' + lista.length + '</span><span class="det">' + preps.length + ' preparaciones</span></div></div>'
+      + '<section class="panel"><h2>Preparaciones</h2>' + (preps.length ? '<div class="tabla-env"><table><thead><tr><th>Receta</th><th class="num">Porciones</th><th class="num">Volumen</th><th class="num">Factor</th></tr></thead><tbody>' + preps.map(p => { const rb = C.rendimientoBase(p.r); return '<tr class="clic" tabindex="0" data-ir="#receta-' + p.r.id + '"><td>' + esc(p.r.nombre) + (p.base ? ' <span class="pill">base</span>' : '') + '</td><td class="num"><b>' + C.fmtCant(p.porc) + '</b></td><td class="num">' + (rb ? C.fmtLegible(rb.base * p.porc / C.porcionesReceta(p.r), rb.dim) : '—') + '</td><td class="num">×' + C.fmtCant(p.porc / C.porcionesReceta(p.r)) + '</td></tr>'; }).join('') + '</tbody></table></div>' : '<p class="tenue">Nada que preparar con los eventos elegidos.</p>') + '</section>'
+      + '<section class="panel"><h2>Lista de compras</h2>' + (lista.length ? Object.keys(porCat).map(cat => '<h3 class="ceja" style="margin-top:6px">' + esc(cat) + '</h3><div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Bruto a surtir</th><th class="num">Comprar</th><th>Proveedor</th><th class="num">Costo</th></tr></thead><tbody>' + porCat[cat].map(f => '<tr><td>' + esc(f.nombre) + '</td><td class="num"><b>' + C.fmtLegible(f.brutaBase, f.dim) + '</b></td><td class="num">' + f.empaquesCompra + ' × ' + C.fmtCant(f.presentacion) + ' ' + esc(C.nombreUnidad(f.unidadCompra)) + '</td><td>' + esc(f.proveedor || '—') + '</td><td class="num">' + dinero(f.costoCompra) + '</td></tr>').join('') + '</tbody></table></div>').join('') : '<div class="vacio"><p>No hay insumos por comprar. Ajusta las fechas o los estatus para incluir eventos.</p></div>') + '</section></div>'
+      + '<aside class="pegajoso"><section class="panel" data-libre><h2>Periodo y eventos</h2><div class="campos" style="grid-template-columns:repeat(2,minmax(0,1fr))"><label class="campo"><span>Desde</span><input type="date" id="cDesde" value="' + esc(e.desde) + '" data-libre></label><label class="campo"><span>Hasta</span><input type="date" id="cHasta" value="' + esc(e.hasta) + '" data-libre></label></div>'
+      + '<div class="campo"><span class="etq">Estatus que se incluyen</span><div class="chips-sel">' + D.ESTATUS.filter(s => s.id !== 'cancelada').map(s => '<label><input type="checkbox" data-est value="' + s.id + '"' + (e.est.includes(s.id) ? ' checked' : '') + ' data-libre>' + s.nombre + '</label>').join('') + '</div></div>'
+      + (eventos.length ? '<ul class="lista-alertas">' + eventos.map(x => '<li><label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer"><input type="checkbox" data-accion="alternarEvento" data-id="' + x.id + '"' + (e.fuera.includes(x.id) ? '' : ' checked') + ' data-libre><span><b>' + esc(x.nombre || x.folio) + '</b><br><span class="tenue">' + fechaCorta(x.fecha) + ' · ' + n0(x.personas) + ' personas</span></span></label>' + pillEstatus(x.estatus) + '</li>').join('') + '</ul>' : '<p class="tenue">No hay eventos con fecha en este periodo y con esos estatus.</p>')
+      + '</section></aside></div>';
+  }
+
+  /* ================================================================ USUARIOS */
+  let cuentas = null;
+  function vUsuarios() {
+    const nombreRol = id => (N.ROLES.find(r => r.id === id) || { nombre: id }).nombre;
+    const pintarLista = () => {
+      const cont = $('listaUsuarios'); if (!cont) return;
+      if (!cuentas) { cont.innerHTML = '<p class="tenue">Cargando cuentas…</p>'; return; }
+      const orden = { false: 0, true: 1 };
+      const filas = cuentas.slice().sort((a, b) => orden[!!a.activo] - orden[!!b.activo] || String(a.correo).localeCompare(String(b.correo))).map(u => {
+        const yo = u.id === N.sesion().uid;
+        const intocable = yo || (u.rol === 'owner' && rol() !== 'owner');
+        const estado = u.activo ? '<span class="pill ok">Activa</span>' : u.bloqueada ? '<span class="pill error">Bloqueada</span>' : '<span class="pill alerta">Por aprobar</span>';
+        const rolSel = intocable || u.rol === 'owner' ? nombreRol(u.rol) + (yo ? ' <span class="tenue">(tú)</span>' : '')
+          : '<select data-uid="' + u.id + '" class="selRol" aria-label="Rol">' + N.ROLES.filter(r => r.id !== 'owner').map(r => '<option value="' + r.id + '"' + (r.id === u.rol ? ' selected' : '') + '>' + r.nombre + '</option>').join('') + '</select>';
+        const acc = intocable ? '' : (u.activo ? '<button class="btn chico" data-accion="bloquear" data-uid="' + u.id + '">Bloquear</button>' : '<button class="btn chico primario" data-accion="aprobar" data-uid="' + u.id + '">Aprobar</button>') + '<button class="icono-btn" data-accion="quitarCuenta" data-uid="' + u.id + '" aria-label="Eliminar cuenta">✕</button>';
+        return '<tr><td><b>' + esc(u.nombre || u.correo) + '</b><br><span class="tenue">' + esc(u.correo) + '</span></td><td>' + rolSel + '</td><td>' + estado + '</td><td class="tenue">' + (u.ultimoAcceso ? fechaCorta(u.ultimoAcceso) : '—') + '</td><td class="acc">' + acc + '</td></tr>';
+      }).join('');
+      cont.innerHTML = '<div class="tabla-env"><table><thead><tr><th>Cuenta</th><th>Rol</th><th>Acceso</th><th>Último acceso</th><th></th></tr></thead><tbody>' + filas + '</tbody></table></div>';
+      cont.querySelectorAll('.selRol').forEach(s => s.addEventListener('change', () => actualizarCuenta(s.dataset.uid, { rol: s.value })));
+    };
+    const cargar = () => { N.usuarios().then(l => { cuentas = l; pintarLista(); }).catch(err => { $('listaUsuarios').innerHTML = '<div class="nota alerta">No se pudieron leer las cuentas: ' + esc(err.message) + '</div>'; }); };
+    const actualizarCuenta = (uid, cambios) => {
+      const u = cuentas.find(x => x.id === uid); if (!u) return;
+      const nuevo = Object.assign({}, u, cambios);
+      N.guardarUsuario(nuevo).then(() => { Object.assign(u, cambios); pintarLista(); aviso('Cuenta actualizada'); }).catch(err => { aviso(err.message === 'SIN_PERMISO' ? 'No tienes permiso para cambiar esta cuenta' : 'No se pudo guardar', true); pintarLista(); });
+    };
+    ctx.alPintar = () => { pintarLista(); cargar(); };
+    ctx.acciones = {
+      aprobar: d => actualizarCuenta(d.uid, { activo: true, bloqueada: false }),
+      bloquear: d => actualizarCuenta(d.uid, { activo: false, bloqueada: true }),
+      quitarCuenta: d => { const u = cuentas.find(x => x.id === d.uid); confirmar('Eliminar cuenta', 'Se quitará el acceso de <b>' + esc(u.correo) + '</b>. Si vuelve a entrar, quedará como solicitud por aprobar.', 'Eliminar', () => N.borrarUsuario(d.uid).then(() => { cuentas = cuentas.filter(x => x.id !== d.uid); pintarLista(); aviso('Cuenta eliminada'); }).catch(() => aviso('No se pudo eliminar', true))); },
+      nuevaCuenta: () => {
+        const temp = 'Civizo-' + Math.random().toString(36).slice(2, 8);
+        abrirModal({
+          titulo: 'Agregar cuenta',
+          cuerpo: '<div class="campos"><label class="campo ancho"><span>Correo</span><input id="nc-correo" type="email" autocomplete="off"></label><label class="campo"><span>Nombre</span><input id="nc-nombre" type="text" autocomplete="off"></label><label class="campo"><span>Rol</span><select id="nc-rol">' + N.ROLES.filter(r => r.id !== 'owner').map(r => '<option value="' + r.id + '"' + (r.id === 'editor' ? ' selected' : '') + '>' + r.nombre + '</option>').join('') + '</select></label><label class="campo ancho"><span>Contraseña temporal</span><input id="nc-clave" type="text" value="' + temp + '" autocomplete="off"><small>Compártela con la persona. También le llegará un correo para que elija la suya.</small></label></div>',
+          botones: [{ texto: 'Cancelar', clase: 'fantasma' }, {
+            texto: 'Crear cuenta', clase: 'primario', accion: c => {
+              const correo = c.querySelector('#nc-correo').value.trim(), nombre = c.querySelector('#nc-nombre').value.trim(), r = c.querySelector('#nc-rol').value, clave = c.querySelector('#nc-clave').value;
+              if (!correo) { aviso('Escribe el correo', true); return false; }
+              N.crearCuentaAjena(correo, clave).then(uid => {
+                const ahora = new Date().toISOString();
+                const u = { id: uid, correo, nombre, rol: r, activo: true, creado: ahora, creadoPor: N.sesion().correo };
+                return N.guardarUsuario(u).then(() => { cuentas = (cuentas || []).concat(u); pintarLista(); N.enviarRestablecer(correo).catch(() => { }); aviso('Cuenta creada para ' + correo); });
+              }).catch(err => aviso(err.message, true));
+            }
+          }]
+        });
+      }
+    };
+    return '<div class="cabecera"><div><span class="ceja">Administración</span><h1>Usuarios</h1><p class="sub">Quién puede entrar y qué puede hacer. Las personas que se registran solas quedan por aprobar.</p></div><div class="acciones"><button class="btn primario" data-accion="nuevaCuenta">' + ico('mas') + 'Agregar cuenta</button></div></div>'
+      + '<div class="rejilla r-lateral"><section class="panel" id="listaUsuarios"></section>'
+      + '<aside><section class="panel"><h2>Roles</h2><div class="resumen">' + N.ROLES.map(r => '<div class="fila"><span><b>' + r.nombre + '</b><br><span class="tenue">' + r.desc + '</span></span></div>').join('') + '</div><p class="tenue">Comparte la dirección de la plataforma. Quien cree su cuenta aparecerá aquí para que la apruebes.</p></section></aside></div>';
+  }
+
+  /* ---------------------------------------------------------- Solo lectura */
+  const ACC_LECTURA = new Set(['ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
+  function aplicarSoloLectura() {
+    document.querySelectorAll('#vista input, #vista select, #vista textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
+    document.querySelectorAll('#vista [data-accion]').forEach(el => { if (!ACC_LECTURA.has(el.dataset.accion)) el.hidden = true; });
+  }
+
+  /* ============================================================ Nube: acceso */
+  function pantallaAcceso(modo, error) {
+    modo = modo || 'entrar';
+    document.querySelector('.app').classList.add('sin-sesion');
+    const registro = modo === 'registro';
+    $('vista').innerHTML = '<div class="acceso"><form class="acceso-tarjeta" id="fAcceso" novalidate>'
+      + '<div class="acceso-marca">' + ISOTIPO + '<div><b>CIVIZO</b><small>Servicios alimentarios</small></div></div>'
+      + '<h1>' + (registro ? 'Crear cuenta' : 'Entrar') + '</h1><p class="sub">' + (registro ? 'Un administrador aprobará tu acceso.' : 'Costeo, recetas y eventos de tu cocina.') + '</p>'
+      + (registro ? '<label class="campo"><span>Nombre</span><input id="aNombre" type="text" autocomplete="name"></label>' : '')
+      + '<label class="campo"><span>Correo</span><input id="aCorreo" type="email" autocomplete="email" required></label>'
+      + '<label class="campo"><span>Contraseña</span><input id="aClave" type="password" autocomplete="' + (registro ? 'new-password' : 'current-password') + '" required></label>'
+      + '<p class="acceso-error" id="aError" role="alert">' + esc(error || '') + '</p>'
+      + '<button class="btn primario" type="submit" id="aBtn">' + (registro ? 'Crear cuenta' : 'Entrar') + '</button>'
+      + '<div class="acceso-pie">' + (registro ? '<button type="button" class="btn fantasma" id="aCambio">Ya tengo cuenta</button>' : '<button type="button" class="btn fantasma" id="aCambio">Crear cuenta</button><button type="button" class="btn fantasma" id="aOlvido">Olvidé mi contraseña</button>') + '</div>'
+      + '</form></div>';
+    $('aCambio').addEventListener('click', () => pantallaAcceso(registro ? 'entrar' : 'registro'));
+    if ($('aOlvido')) $('aOlvido').addEventListener('click', () => {
+      const correo = $('aCorreo').value.trim();
+      if (!correo) { $('aError').textContent = 'Escribe tu correo y vuelve a tocar "Olvidé mi contraseña".'; return; }
+      N.enviarRestablecer(correo).then(() => { $('aError').textContent = ''; aviso('Te enviamos un correo para cambiar tu contraseña'); }).catch(e => { $('aError').textContent = e.message; });
+    });
+    $('fAcceso').addEventListener('submit', async ev => {
+      ev.preventDefault();
+      const correo = $('aCorreo').value.trim(), clave = $('aClave').value;
+      if (!correo || !clave) { $('aError').textContent = 'Escribe tu correo y tu contraseña.'; return; }
+      $('aBtn').disabled = true; $('aError').textContent = '';
+      try {
+        if (registro) await N.registrarme(correo, clave); else await N.entrar(correo, clave);
+        entrarConSesion(registro ? $('aNombre').value.trim() : '');
+      } catch (e) { $('aError').textContent = e.message; $('aBtn').disabled = false; }
+    });
+    setTimeout(() => $('aCorreo').focus(), 30);
+  }
+  function pantallaMensaje(titulo, texto, botones) {
+    document.querySelector('.app').classList.add('sin-sesion');
+    $('vista').innerHTML = '<div class="acceso"><div class="acceso-tarjeta"><div class="acceso-marca">' + ISOTIPO + '<div><b>CIVIZO</b><small>Servicios alimentarios</small></div></div><h1>' + titulo + '</h1><p class="sub">' + texto + '</p><div class="acceso-pie" id="msjBotones"></div></div></div>';
+    (botones || []).forEach(b => { const el = document.createElement('button'); el.type = 'button'; el.className = 'btn ' + (b.clase || ''); el.textContent = b.texto; el.onclick = b.accion; $('msjBotones').appendChild(el); });
+  }
+  function salir() { N.salir(); perfil = null; db = D.vacio(); reindexar(); pintarCuenta(); pantallaAcceso(); }
+  async function entrarConSesion(nombre) {
+    pantallaMensaje('Conectando…', 'Descargando la información de tu cocina.');
+    try {
+      perfil = await N.perfil(nombre);
+      if (!perfil.activo) {
+        const p = perfil; perfil = null;
+        return pantallaMensaje(p.bloqueada ? 'Cuenta bloqueada' : 'Tu cuenta está por aprobar', esc(p.correo) + (p.bloqueada ? ' no tiene acceso. Habla con un administrador.' : ' ya quedó registrada. Pide a un administrador que la apruebe en <b>Usuarios</b> y vuelve a intentar.'), [{ texto: 'Volver a intentar', clase: 'primario', accion: () => entrarConSesion() }, { texto: 'Salir', accion: salir }]);
+      }
+      db = D.normalizar(await N.cargarTodo(D.vacio));
+      N.fijarBase(db); reindexar();
+      document.querySelector('.app').classList.remove('sin-sesion');
+      pintarCuenta();
+      rutaPrevia = ''; render();
+      iniciarSondeo();
+      if (perfil.primero) bienvenidaDueno();
+    } catch (e) {
+      if (e.message === 'SIN_SESION') return pantallaAcceso('entrar', 'Tu sesión terminó. Vuelve a entrar.');
+      perfil = null;
+      pantallaMensaje('No se pudo conectar', e.message === 'SIN_PERMISO' ? 'Firebase rechazó la lectura. Revisa que las reglas de config/firestore.rules estén publicadas.' : e.red || e.message === 'SIN_CONEXION' ? 'Sin conexión con el servidor. Revisa tu internet.' : esc(e.message), [{ texto: 'Reintentar', clase: 'primario', accion: () => entrarConSesion() }, { texto: 'Salir', accion: salir }]);
+    }
+  }
+  function datosLocalesGuardados() {
+    try { const t = localStorage.getItem(D.CLAVE); return t ? D.normalizar(JSON.parse(t)) : null; } catch (e) { return null; }
+  }
+  function subirDatosLocales() {
+    const loc = datosLocalesGuardados();
+    if (!loc) return aviso('No hay información guardada en este equipo', true);
+    let n = 0;
+    ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); loc[k].forEach(x => { if (!ids.has(x.id)) { db[k].push(x); n++; } }); });
+    if (!db.insumos.length && !n) return aviso('No hay nada nuevo que subir');
+    if (loc.empresa && !db.empresa.telefono && !db.empresa.correo) Object.assign(db.empresa, loc.empresa);
+    cambioEstructura(); render();
+    aviso(n + ' elementos subidos a la nube');
+  }
+  function bienvenidaDueno() {
+    const loc = datosLocalesGuardados();
+    const cuantos = loc ? loc.insumos.length + loc.recetas.length + loc.servicios.length + loc.eventos.length : 0;
+    abrirModal({
+      titulo: 'Eres el dueño de esta cocina',
+      cuerpo: '<p>Tu cuenta es la primera del proyecto, así que tiene todos los permisos. Las demás personas que se registren quedarán por aprobar en <b>Usuarios</b>.</p>'
+        + (cuantos ? '<div class="nota acento">Este navegador tiene <b>' + cuantos + ' elementos</b> capturados en modo local. Puedes subirlos a la nube ahora.</div>' : '<p>La nube está vacía. Puedes empezar a capturar o cargar los datos de ejemplo.</p>'),
+      botones: cuantos
+        ? [{ texto: 'Después', clase: 'fantasma' }, { texto: 'Subir lo de este equipo', clase: 'primario', accion: () => subirDatosLocales() }]
+        : [{ texto: 'Empezar vacío', clase: 'fantasma' }, { texto: 'Cargar datos de ejemplo', clase: 'primario', accion: () => { const ej = D.ejemplo(); ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { db[k] = db[k].concat(ej[k]); }); cambioEstructura(); render(); } }]
+    });
+  }
+  let pendienteRemoto = false, sondeando = false, tSondeo = null;
+  function iniciarSondeo() {
+    clearInterval(tSondeo);
+    tSondeo = setInterval(sondear, 60000);
+  }
+  async function sondear() {
+    if (!NUBE || !perfil || sondeando || document.hidden) return;
+    sondeando = true;
+    try {
+      if (await N.sondear(db)) { reindexar(); refrescarPorRemoto(); }
+    } catch (e) { if (e.message === 'SIN_SESION') salir(); }
+    sondeando = false;
+  }
+  function editandoAhora() {
+    const a = document.activeElement;
+    return !$('modal').hidden || (a && $('vista').contains(a) && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName) && !ENTRADAS_LIBRES.test(a.id));
+  }
+  function refrescarPorRemoto() { if (editandoAhora()) pendienteRemoto = true; else { pendienteRemoto = false; render(); } }
+  document.addEventListener('focusout', () => setTimeout(() => { if (pendienteRemoto && !editandoAhora()) { pendienteRemoto = false; render(); } }, 50));
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) sondear(); });
+  window.addEventListener('beforeunload', ev => { if (NUBE && perfil && N.hayPendientes(db)) { ev.preventDefault(); ev.returnValue = ''; } });
+
+  function pintarCuenta() {
+    let el = $('cuentaLateral');
+    if (!el) { el = document.createElement('div'); el.id = 'cuentaLateral'; el.className = 'cuenta-lateral'; $('estadoGuardado').before(el); }
+    if (!NUBE) { el.innerHTML = ''; el.hidden = true; return; }
+    el.hidden = !perfil;
+    if (!perfil) return;
+    el.innerHTML = '<span class="cuenta-txt"><b>' + esc(perfil.nombre || perfil.correo) + '</b><small>' + esc((N.ROLES.find(r => r.id === perfil.rol) || {}).nombre || '') + '</small></span><button type="button" class="icono-btn salir" id="btnSalir" aria-label="Cerrar sesión" title="Cerrar sesión">' + ico('salir') + '</button>';
+    $('btnSalir').onclick = () => { if (N.hayPendientes(db)) return confirmar('Hay cambios sin subir', 'Algunos cambios todavía no llegan a la nube. Si sales ahora se pierden.', 'Salir de todos modos', salir); salir(); };
+  }
+  function arrancar() {
+    if (!NUBE) { $('estadoGuardado').textContent = 'Modo local · guardado en este equipo'; render(); return; }
+    N.alEstado((estado, err) => {
+      const el = $('estadoGuardado');
+      const txt = { pendiente: 'Guardando en la nube…', ok: 'Guardado en la nube · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }), error: 'Sin conexión: se reintentará solo', 'sin-permiso': 'Tu cuenta no tiene permiso para guardar' }[estado];
+      el.textContent = txt; el.classList.toggle('error', estado === 'error' || estado === 'sin-permiso');
+      if (estado === 'sin-permiso') aviso('Tu cuenta no tiene permiso para guardar cambios', true);
+      void err;
+    });
+    if (!N.sesion()) return pantallaAcceso();
+    entrarConSesion();
+  }
+
   /* ================================================================ AJUSTES */
   function vAjustes() {
     ctx.obj = db;
@@ -924,7 +1268,8 @@
         ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { const ids = new Set(db[k].map(x => x.id)); ej[k].forEach(x => { if (!ids.has(x.id)) db[k].push(x); }); });
         cambioEstructura(); aviso('Datos de ejemplo agregados'); render();
       }),
-      borrarTodo: () => confirmar('Borrar toda la información', 'Se borrarán todos los insumos, recetas, servicios y eventos de este equipo. Descarga un respaldo antes si lo necesitas.', 'Borrar todo', () => {
+      subirLocal: () => confirmar('Subir a la nube', 'Se agregarán a la nube los insumos, recetas, servicios y eventos guardados en este navegador que todavía no estén en ella. No se borra nada.', 'Subir', subirDatosLocales),
+      borrarTodo: () => confirmar('Borrar toda la información', NUBE ? 'Se borrarán todos los insumos, recetas, servicios y eventos <b>para todas las cuentas</b>. Descarga un respaldo antes.' : 'Se borrarán todos los insumos, recetas, servicios y eventos de este equipo. Descarga un respaldo antes si lo necesitas.', 'Borrar todo', () => {
         const e = db.empresa, p = db.parametros; db = D.vacio(); db.empresa = e; db.parametros = p; cambioEstructura(); aviso('Información borrada'); ir('#inicio');
       })
     };
@@ -938,9 +1283,10 @@
       + campoTexto('IVA', 'iva', db.parametros.iva, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Margen de utilidad', 'margen', db.parametros.margen, { grupo: 'parametros', num: true, suf: '%' })
       + campoTexto('Food cost objetivo', 'foodCost', db.parametros.foodCost, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Gastos indirectos', 'indirectos', db.parametros.indirectos, { grupo: 'parametros', num: true, suf: '%', ayuda: 'Renta, luz, administración…' })
       + '</div><label class="campo"><span>Apariencia</span><select id="tema"><option value=""' + (!tema ? ' selected' : '') + '>Igual que el sistema</option><option value="light"' + (tema === 'light' ? ' selected' : '') + '>Clara</option><option value="dark"' + (tema === 'dark' ? ' selected' : '') + '>Oscura</option></select></label></section></div>'
-      + '<section class="panel"><h2>Tu información</h2><p class="tenue">Todo se guarda en este navegador. Descarga un respaldo con frecuencia y úsalo para pasar la información a otra computadora.</p>'
+      + '<section class="panel"><h2>Tu información</h2><p class="tenue">' + (NUBE ? 'Se guarda en la nube y todas las cuentas ven lo mismo. Descarga un respaldo de vez en cuando como seguridad.' : 'Todo se guarda en este navegador. Descarga un respaldo con frecuencia y úsalo para pasar la información a otra computadora.') + '</p>'
       + '<div class="acciones"><button class="btn primario" data-accion="respaldo">' + ico('bajar') + 'Descargar respaldo</button><button class="btn" data-accion="restaurar">' + ico('subir') + 'Restaurar respaldo</button>'
       + (D.hayEjemplos(db) ? '<button class="btn" data-accion="quitarEjemplos">Borrar datos de ejemplo</button>' : '<button class="btn" data-accion="cargarEjemplo">Cargar datos de ejemplo</button>')
+      + (NUBE && datosLocalesGuardados() ? '<button class="btn" data-accion="subirLocal">' + ico('subir') + 'Subir lo capturado en este equipo</button>' : '')
       + '<button class="btn peligro" data-accion="borrarTodo">' + ico('borrar') + 'Borrar todo</button></div>'
       + '<p class="tenue">' + db.insumos.length + ' insumos · ' + db.recetas.length + ' recetas · ' + db.servicios.length + ' servicios · ' + db.eventos.length + ' eventos</p></section>';
   }
@@ -1135,5 +1481,5 @@
       + '<div class="totales"><div class="gran"><span>Total de compra</span><span>' + dinero(lista.reduce((s, f) => s + f.costoCompra, 0)) + '</span></div></div>' + pieDoc();
   }
 
-  render();
+  arrancar();
 })();
