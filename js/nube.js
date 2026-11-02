@@ -24,7 +24,7 @@
   const CFG = raizGlobal.CONFIG_NUBE || {};
   const HAY_NUBE = !!(CFG.apiKey && CFG.projectId);
   const LLAVE_SESION = 'civizo.sesion.v1';
-  const COLS = ['insumos', 'recetas', 'servicios', 'eventos', 'solicitudes'];
+  const COLS = ['insumos', 'recetas', 'servicios', 'eventos', 'solicitudes', 'proveedores'];
   const ROLES = [
     { id: 'owner', nombre: 'Dueño', desc: 'Todo, incluidas las cuentas' },
     { id: 'admin', nombre: 'Administrador', desc: 'Todo, incluidas las cuentas y ajustes' },

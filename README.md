@@ -54,6 +54,22 @@ marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 | **Usuarios** | Solo con Firebase: cuentas, roles (Dueño, Administrador, Editor, Consulta) y solicitudes de acceso. |
 | **Ajustes** | Datos de la empresa para los documentos, IVA / margen / food cost / indirectos por omisión, modo claro u oscuro, respaldo y restauración JSON. |
 
+## Proveedores
+
+- **Catálogo** con tipo, contacto, teléfono, WhatsApp, correo, RFC, dirección, sitio,
+  forma de pago (contado o crédito con días), pedido mínimo y días de entrega.
+- **Detectados**: las tiendas que ya aparecen en tus cotizaciones se agregan con un toque.
+  El vínculo con insumos y cotizaciones es por nombre; cambiar el nombre del proveedor
+  actualiza esas referencias.
+- En cada proveedor: lo que le cotizamos, su precio por kg / L / pza y si es el mejor
+  o cuánto está por encima del más barato.
+- **Comparar precios**: tabla de insumos contra proveedores con el mejor precio en verde.
+  Avisa qué insumos se costean sin el mejor precio y los cambia con "Usar …".
+- **Pedidos por proveedor** (en Producción y compras y en la lista de compras de cada
+  evento): la lista se divide por proveedor; cada pedido sale como **orden de compra**
+  imprimible, texto para copiar o mensaje de **WhatsApp** listo para enviar, con aviso
+  si no llega al pedido mínimo.
+
 ## Cobranza
 
 - Todo evento **aprobado** o **realizado** entra a Cobranza con un **plan de pagos**:
