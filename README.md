@@ -68,3 +68,13 @@ Firebase Hosting (`firebase deploy --only hosting`). No requiere compilación.
 - Historial de precios por insumo y comparativo entre proveedores.
 - Fotos de montaje en la ficha técnica.
 - Tabla nutrimental por receta.
+
+### GitHub Pages (paso a paso)
+
+1. En el repositorio: **Settings → Pages**.
+2. En *Build and deployment → Source* elige **Deploy from a branch**.
+3. Rama **`claude/civizo-cocina`**, carpeta **`/ (root)`** → **Save**.
+4. En 1–2 minutos queda en `https://victormejia-ship-it.github.io/C-V/`.
+
+El archivo `.nojekyll` hace que GitHub sirva los archivos tal cual, sin procesarlos.
+Si después se fusiona a `main`, cambia la rama en ese mismo menú.
