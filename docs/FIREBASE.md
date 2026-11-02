@@ -78,3 +78,24 @@ Las reglas incluyen lo que necesita el sitio público:
 
 Cada vez que cambie `config/firestore.rules` hay que volver a publicarlas en la consola
 (Firestore Database → Reglas → pegar → Publicar).
+
+## Publicación automática de reglas
+
+`.github/workflows/reglas-firestore.yml` publica `config/firestore.rules` en el proyecto
+`civizo` cada vez que cambian en `main`. Configuración de una sola vez:
+
+1. Consola de Firebase → ⚙ **Configuración del proyecto** → pestaña **Cuentas de servicio**
+   → **Generar nueva clave privada** → **Generar clave**. Se descarga un archivo `.json`.
+2. GitHub → repositorio **C-V** → **Settings** → **Secrets and variables** → **Actions** →
+   **New repository secret**.
+   - Name: `FIREBASE_SERVICE_ACCOUNT`
+   - Secret: pega **todo** el contenido del archivo `.json`.
+   - **Add secret**.
+3. Borra el archivo `.json` de tu equipo. GitHub lo guarda cifrado y no lo vuelve a mostrar.
+
+Para probarlo sin cambiar las reglas: pestaña **Actions** → **Publicar reglas de Firestore**
+→ **Run workflow**.
+
+Esa clave tiene permisos amplios sobre el proyecto. Para limitarla, en Google Cloud →
+IAM se puede crear otra cuenta de servicio solo con el rol **Firebase Rules Admin** y usar
+su clave en el mismo secreto.
