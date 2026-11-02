@@ -8,6 +8,20 @@ Es una página estática, sin servidor, en el mismo estilo que Forguard y
 Profectus: se abre `index.html` y funciona. Todo está en español y con la
 marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 
+## Cómo se navega
+
+- **Inicio**: íconos de cada función, un saludo y el resumen del día. La lupa
+  busca en toda la plataforma, el círculo con tu inicial abre tu cuenta y el
+  botón **+** crea un evento, receta, servicio o insumo.
+- Cada función se abre como **pantalla completa** encima del inicio, y dentro
+  de ella cada elemento se abre como otra pantalla encima.
+- **Regresar** (flecha de la barra, botón atrás del navegador o del celular, o
+  Esc) quita solo la pantalla de arriba: la de abajo sigue donde se quedó,
+  con su desplazamiento y lo que tenías escrito. El ícono de cuadritos lleva
+  directo al inicio.
+- Los formularios, listas de compras y confirmaciones también son pantallas
+  completas (o una hoja corta en las confirmaciones) y se cierran igual.
+
 ## Módulos
 
 | Módulo | Para qué sirve |

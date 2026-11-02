@@ -57,13 +57,19 @@
     clearTimeout(tGuardar);
     const hacer = () => {
       const ok = D.guardar(db);
-      const el = $('estadoGuardado');
-      el.textContent = ok ? 'Guardado en este equipo · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }) : 'No se pudo guardar: el navegador bloquea el almacenamiento. Descarga un respaldo.';
-      el.classList.toggle('error', !ok);
+      mostrarEstado(ok ? 'ok' : 'error', ok ? 'Guardado' : 'No se pudo guardar en este navegador. Descarga un respaldo.');
     };
     if (inmediato) hacer(); else tGuardar = setTimeout(hacer, 250);
   }
   function cambioEstructura() { reindexar(); guardar(true); }
+  let tEstado;
+  function mostrarEstado(tipo, texto) {
+    const el = $('estado');
+    el.querySelector('span').textContent = texto;
+    el.className = 'estado visible ' + tipo;
+    clearTimeout(tEstado);
+    if (tipo === 'ok') tEstado = setTimeout(() => el.classList.remove('visible'), 1800);
+  }
 
   /* ------------------------------------------------------------ Íconos */
   const ICO = {
@@ -96,17 +102,7 @@
     facturacion: '<path d="M6 3h12v18l-3-2-3 2-3-2-3 2V3z"/><path d="M9 8h6M9 12h6M9 16h3"/>'
   };
   const ico = (k, cls) => '<svg viewBox="0 0 24 24"' + (cls ? ' class="' + cls + '"' : '') + ' aria-hidden="true">' + (ICO[k] || '') + '</svg>';
-  const ISOTIPO = document.querySelector('.isotipo').outerHTML;
-
-  function menu() {
-    const m = [['inicio', 'Inicio'], ['tablero', 'Tablero'], ['eventos', 'Eventos'], ['servicios', 'Servicios'], ['recetas', 'Recetas'], ['insumos', 'Insumos'], ['compras', 'Compras']];
-    if (NUBE && esAdmin()) m.push(['usuarios', 'Usuarios']);
-    if (esAdmin()) m.push(['ajustes', 'Ajustes']);
-    return m;
-  }
-  function pintarMenu(activo) {
-    $('menu').innerHTML = menu().map(([k, t]) => '<a href="#' + k + '" class="' + (k === activo ? 'activo' : '') + '"' + (k === activo ? ' aria-current="page"' : '') + '>' + ico(k) + '<span>' + t + '</span></a>').join('');
-  }
+  const ISOTIPO = $('tplIsotipo').innerHTML;
 
   /* ------------------------------------------------------------ Avisos */
   let tAviso;
@@ -116,62 +112,191 @@
     clearTimeout(tAviso); tAviso = setTimeout(() => { el.hidden = true; }, 3200);
   }
 
-  /* ------------------------------------------------------------ Modal */
+  /* ------------------------------------------------------------ Modal (hoja de pantalla completa) */
   let modalAcciones = {};
-  function abrirModal({ titulo, cuerpo, botones, ancho, alAbrir }) {
+  let modalEntrada = false;      // el modal ocupa una entrada del historial (para cerrarlo con "atrás")
+  let volviendo = false;         // hay un history.back() en curso
+  const trasVolver = [];
+  function abrirModal(op) {
+    if (volviendo) { trasVolver.push(() => abrirModal(op)); return; }
+    const { titulo, cuerpo, botones, ancho, alAbrir, compacto } = op;
     $('modalTitulo').textContent = titulo;
-    $('modalCuerpo').innerHTML = cuerpo;
+    const viejo = $('modalCuerpo'), limpio = viejo.cloneNode(false);   // sin oyentes de modales anteriores
+    viejo.replaceWith(limpio);
+    limpio.innerHTML = cuerpo;
     modalAcciones = {};
     $('modalPie').innerHTML = (botones || []).map((b, i) => {
       modalAcciones[i] = b.accion;
       return '<button type="button" class="btn ' + (b.clase || '') + '" data-mbtn="' + i + '">' + b.texto + '</button>';
     }).join('');
     $('modal').querySelector('.modal').classList.toggle('ancho', !!ancho);
+    $('modal').classList.toggle('compacto', !!compacto);
+    const yaAbierto = !$('modal').hidden;
     $('modal').hidden = false;
+    if (!yaAbierto && !modalEntrada) { modalEntrada = true; history.pushState(Object.assign(estadoHist(), { modal: true }), '', location.href); }
     if (alAbrir) alAbrir($('modalCuerpo'));
-    const primero = $('modalCuerpo').querySelector('input, select, textarea');
-    (primero || $('modal').querySelector('[data-cerrar]')).focus();
+    const primero = $('modalCuerpo').querySelector('input:not([type=checkbox]), select, textarea');
+    (primero || $('modal').querySelector('[data-mbtn]') || $('modal').querySelector('[data-cerrar]')).focus();
   }
-  function cerrarModal() { $('modal').hidden = true; $('modalCuerpo').innerHTML = ''; modalAcciones = {}; }
+  function ocultarModal() { $('modal').hidden = true; $('modalCuerpo').innerHTML = ''; modalAcciones = {}; }
+  function cerrarModal() {
+    if ($('modal').hidden) return;
+    ocultarModal();
+    if (modalEntrada) { modalEntrada = false; volviendo = true; history.back(); }
+  }
   $('modal').addEventListener('click', e => {
-    if (e.target === $('modal') || e.target.closest('[data-cerrar]')) return cerrarModal();
+    if ((e.target === $('modal') && $('modal').classList.contains('compacto')) || e.target.closest('[data-cerrar]')) return cerrarModal();
     const b = e.target.closest('[data-mbtn]');
     if (b) { const f = modalAcciones[b.dataset.mbtn]; if (!f || f($('modalCuerpo')) !== false) cerrarModal(); }
   });
-  document.addEventListener('keydown', e => { if (e.key === 'Escape' && !$('modal').hidden) cerrarModal(); });
+  document.addEventListener('keydown', e => {
+    if (e.key !== 'Escape') return;
+    if (!$('modal').hidden) return cerrarModal();
+    const a = document.activeElement;
+    if (a && /^(INPUT|SELECT|TEXTAREA)$/.test(a.tagName)) return a.blur();
+    if (pila.length) atras();
+  });
 
   function confirmar(titulo, mensaje, textoOk, alOk) {
-    abrirModal({ titulo, cuerpo: '<p>' + mensaje + '</p>', botones: [{ texto: 'Cancelar', clase: 'fantasma' }, { texto: textoOk, clase: 'peligro lleno', accion: alOk }] });
+    abrirModal({ titulo, compacto: true, cuerpo: '<p>' + mensaje + '</p>', botones: [{ texto: 'Cancelar', clase: 'fantasma' }, { texto: textoOk, clase: 'peligro lleno', accion: alOk }] });
   }
 
-  /* ------------------------------------------------------------ Rutas */
-  function ruta() {
-    const h = decodeURIComponent(location.hash.slice(1)) || 'inicio';
-    const m = h.match(/^(receta|servicio|evento)-(.+)$/);
-    return m ? { vista: m[1], id: m[2] } : { vista: h, id: null };
+  /* ------------------------------------------------------------ Navegación por capas
+     El inicio siempre está abajo. Cada función se abre como una capa de
+     pantalla completa encima. "Atrás" (botón, navegador, gesto o Esc) quita
+     solo la capa de arriba y la de abajo aparece donde se quedó. */
+  let pila = [];
+  let entradas = 0;
+  const limpiar = h => decodeURIComponent(String(h || '').replace(/^#/, ''));
+  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
+  const tope = () => pila.length ? pila[pila.length - 1] : 'inicio';
+  const urlDe = () => pila.length ? '#' + tope() : location.pathname + location.search;
+  function estadoHist() { return { civizo: true, pila: pila.slice(), entradas }; }
+  function capas() { return Array.from($('vista').children).filter(c => c.classList.contains('capa') && !c.classList.contains('saliendo')); }
+  function capaActual() { const cs = capas(); return cs[cs.length - 1] || $('vista'); }
+  function abrir(h) {
+    h = limpiar(h);
+    if (!h || h === 'inicio') return irInicio();
+    if (modalEntrada) { ocultarModal(); modalEntrada = false; pila.push(h); history.replaceState(estadoHist(), '', urlDe()); return pintar('push'); }
+    if (!$('modal').hidden) ocultarModal();
+    if (h === tope()) return render();
+    pila.push(h); entradas++;
+    history.pushState(estadoHist(), '', urlDe());
+    pintar('push');
   }
-  function ir(h) { if (location.hash === h) render(); else location.hash = h; }
-  let rutaPrevia = '';
-  function render() {
-    const r = ruta();
+  function reemplazar(h) {
+    h = limpiar(h);
+    if (pila.length) pila[pila.length - 1] = h; else { pila.push(h); entradas++; }
+    history.replaceState(estadoHist(), '', urlDe());
+    pintar('reemplazo');
+  }
+  function atras() {
+    if (!$('modal').hidden) return cerrarModal();
+    if (!pila.length) return;
+    if (entradas > 0) { history.back(); return; }
+    pila.pop(); history.replaceState(estadoHist(), '', urlDe()); pintar('pop');
+  }
+  function irInicio() {
+    const extra = modalEntrada ? 1 : 0;
+    if (!$('modal').hidden) { ocultarModal(); modalEntrada = false; }
+    if (entradas + extra > 0) history.go(-(entradas + extra));
+    else { pila = []; history.replaceState(estadoHist(), '', urlDe()); pintar('pop'); }
+  }
+  window.addEventListener('popstate', ev => {
+    const st = ev.state;
+    if (!$('modal').hidden) { ocultarModal(); }
+    modalEntrada = false;
+    if (st && st.civizo && st.modal) { volviendo = true; history.back(); return; }   // adelante hacia un modal ya cerrado
+    if (st && st.civizo) { pila = st.pila.slice(); entradas = st.entradas; }
+    else { const h = limpiar(location.hash); pila = h && h !== 'inicio' ? [h] : []; entradas = 0; history.replaceState(estadoHist(), '', urlDe()); }
+    pintar('pop');
+    if (volviendo) { volviendo = false; trasVolver.splice(0).forEach(f => f()); }
+  });
+  const reducido = () => window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function nuevaCapa(ruta) {
+    const c = document.createElement('section');
+    c.className = 'capa' + (ruta === 'inicio' ? ' capa-inicio' : '');
+    c.dataset.ruta = ruta;
+    c.tabIndex = -1;
+    c.addEventListener('scroll', () => c.classList.toggle('compacta', c.scrollTop > 40), { passive: true });
+    return c;
+  }
+  /** Ajusta las capas del DOM a la pila y pinta la de arriba. */
+  function pintar(modo) {
     if (NUBE && !perfil) return;
-    const vistas = { inicio: vInicio, tablero: vTablero, insumos: vInsumos, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios };
+    const v = $('vista');
+    if (!v.querySelector(':scope > .capa-inicio')) { v.innerHTML = ''; v.appendChild(nuevaCapa('inicio')); }
+    const rutas = ['inicio'].concat(pila);
+    const cs = capas();
+    let i = 1;
+    while (i < cs.length && i < rutas.length && cs[i].dataset.ruta === rutas[i]) i++;
+    cs.slice(i).forEach(c => {
+      c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id'));
+      if (modo === 'pop' && !reducido()) { c.classList.add('saliendo'); c.setAttribute('inert', ''); setTimeout(() => c.remove(), 220); }
+      else c.remove();
+    });
+    for (let k = i; k < rutas.length; k++) {
+      const c = nuevaCapa(rutas[k]);
+      if (k === rutas.length - 1 && (modo === 'push' || modo === 'reemplazo') && !reducido()) c.classList.add('entrando');
+      v.appendChild(c);
+    }
+    const vivas = capas();
+    vivas.forEach((c, k) => {
+      const arriba = k === vivas.length - 1;
+      if (arriba) { c.removeAttribute('inert'); c.removeAttribute('aria-hidden'); }
+      else { c.setAttribute('inert', ''); c.setAttribute('aria-hidden', 'true'); c.querySelectorAll('[id]').forEach(e => e.removeAttribute('id')); }
+    });
+    render();
+    const top = capaActual();
+    if (modo === 'push' || modo === 'reemplazo') { top.scrollTop = 0; top.focus({ preventScroll: true }); }
+  }
+  const NAV_ATRAS = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>';
+  const NAV_INICIO = '<svg viewBox="0 0 24 24" aria-hidden="true"><rect x="4" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="4" width="6.5" height="6.5" rx="1.8"/><rect x="4" y="13.5" width="6.5" height="6.5" rx="1.8"/><rect x="13.5" y="13.5" width="6.5" height="6.5" rx="1.8"/></svg>';
+  /** Pinta la capa de arriba conservando su posición de desplazamiento. */
+  function render() {
+    if (NUBE && !perfil) return;
+    const c = capaActual();
+    if (!c || !c.classList.contains('capa')) return pintar('reemplazo');
+    const ruta = c.dataset.ruta, r = rutaDe(ruta);
+    const vistas = { tablero: vTablero, insumos: vInsumos, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
     if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; }
     if (!NUBE) delete vistas.usuarios;
-    const f = vistas[r.vista] || vInicio;
-    const menuActivo = { receta: 'recetas', servicio: 'servicios', evento: 'eventos' }[r.vista] || (vistas[r.vista] ? r.vista : 'inicio');
-    pintarMenu(menuActivo);
     ctx = { obj: null, recalcular: null, acciones: {} };
-    const cambio = location.hash !== rutaPrevia;
-    rutaPrevia = location.hash;
-    $('vista').innerHTML = '<div class="contenido">' + f(r.id) + '</div>';
+    const pos = c.scrollTop;
+    if (r.vista === 'inicio') c.innerHTML = vInicio();
+    else {
+      const f = vistas[r.vista];
+      const cuerpo = f ? f(r.id) : noEncontrado('Esta sección', null, 'Ir al inicio');
+      c.innerHTML = '<header class="barra"><button type="button" class="barra-btn" data-nav="atras" aria-label="Regresar" title="Regresar">' + NAV_ATRAS + '</button><span class="barra-titulo"></span><div class="barra-acc"></div><button type="button" class="barra-btn" data-nav="inicio" aria-label="Ir al inicio" title="Inicio">' + NAV_INICIO + '</button></header><div class="contenido">' + cuerpo + '</div>';
+      const acc = c.querySelector('.contenido > .cabecera > .acciones');
+      if (acc) c.querySelector('.barra-acc').appendChild(acc);
+      c.querySelectorAll('.barra-acc .btn').forEach(b => {
+        Array.from(b.childNodes).forEach(n => { if (n.nodeType === 3 && n.textContent.trim()) { const s = document.createElement('span'); s.className = 'btxt'; s.textContent = n.textContent; n.replaceWith(s); } });
+        const t = b.textContent.trim(); if (t && !b.getAttribute('aria-label')) { b.setAttribute('aria-label', t); b.title = t; }
+      });
+      const h1 = c.querySelector('.contenido h1');
+      c.querySelector('.barra-titulo').textContent = h1 ? h1.textContent : '';
+    }
     if (ctx.alPintar) ctx.alPintar();
     if (!puedeEditar()) aplicarSoloLectura();
-    if (cambio) { window.scrollTo(0, 0); }
-    const t = document.querySelector('.contenido h1');
+    c.scrollTop = pos;
+    c.classList.toggle('compacta', c.scrollTop > 40);
+    const t = r.vista === 'inicio' ? null : c.querySelector('.contenido h1');
     document.title = (t ? t.textContent + ' · ' : '') + 'CIVIZO Cocina';
   }
-  window.addEventListener('hashchange', render);
+  /** Título de la barra y del documento cuando se edita el nombre en vivo. */
+  function actualizarTitulo(txt) {
+    const c = capaActual();
+    const h1 = c.querySelector('.contenido h1'); if (h1) h1.textContent = txt;
+    const bt = c.querySelector('.barra-titulo'); if (bt) bt.textContent = txt;
+  }
+  window.addEventListener('hashchange', () => {
+    const h = limpiar(location.hash);
+    if ((h || 'inicio') === tope()) return;
+    pila = h && h !== 'inicio' ? [h] : []; entradas = 0;
+    history.replaceState(estadoHist(), '', urlDe());
+    pintar('reemplazo');
+  });
 
   /* --------------------------------------------- Edición en línea genérica */
   function objetivo(el) {
@@ -214,12 +339,16 @@
       if (f) { e.preventDefault(); f(a.dataset, a); }
       return;
     }
+    const nav = e.target.closest('[data-nav]');
+    if (nav) { e.preventDefault(); return nav.dataset.nav === 'inicio' ? irInicio() : atras(); }
+    const enlace = e.target.closest('a[href^="#"]');
+    if (enlace && vista.contains(enlace)) { e.preventDefault(); return abrir(enlace.getAttribute('href')); }
     const fila = e.target.closest('[data-ir]');
-    if (fila && !e.target.closest('a, button, input, select, textarea')) ir(fila.dataset.ir);
+    if (fila && !e.target.closest('a, button, input, select, textarea')) abrir(fila.dataset.ir);
   });
   vista.addEventListener('keydown', e => {
     const fila = e.target.closest && e.target.closest('tr[data-ir], tr[data-accion]');
-    if (fila && (e.key === 'Enter' || e.key === ' ') && e.target === fila) { e.preventDefault(); if (fila.dataset.ir) ir(fila.dataset.ir); else fila.click(); }
+    if (fila && (e.key === 'Enter' || e.key === ' ') && e.target === fila) { e.preventDefault(); if (fila.dataset.ir) abrir(fila.dataset.ir); else fila.click(); }
   });
 
   /* ---------------------------------------------- Helpers de formularios */
@@ -315,7 +444,7 @@
         const id = $('rapidaReceta').value, v = C.num($('rapidaPorc').value);
         if (!id) return aviso('Elige una receta', true);
         escalas[id] = { valor: v > 0 ? v : 100, modo: 'porc' };
-        ir('#receta-' + id);
+        abrir('receta-' + id);
       }
     };
 
@@ -454,7 +583,7 @@
   function eliminarInsumo(id) {
     const u = usosInsumo(id);
     if (u.recetas.length || u.servicios.length) {
-      setTimeout(() => abrirModal({ titulo: 'No se puede eliminar', cuerpo: '<p>Este insumo se usa en:</p><ul>' + u.recetas.map(r => '<li>Receta: ' + esc(r.nombre) + '</li>').join('') + u.servicios.map(s => '<li>Servicio: ' + esc(s.nombre) + '</li>').join('') + '</ul><p>Quítalo de ahí primero o reemplázalo por otro insumo.</p>', botones: [{ texto: 'Entendido', clase: 'primario' }] }), 0);
+      setTimeout(() => abrirModal({ titulo: 'No se puede eliminar', compacto: true, cuerpo: '<p>Este insumo se usa en:</p><ul>' + u.recetas.map(r => '<li>Receta: ' + esc(r.nombre) + '</li>').join('') + u.servicios.map(s => '<li>Servicio: ' + esc(s.nombre) + '</li>').join('') + '</ul><p>Quítalo de ahí primero o reemplázalo por otro insumo.</p>', botones: [{ texto: 'Entendido', clase: 'primario' }] }), 0);
       return;
     }
     db.insumos = db.insumos.filter(i => i.id !== id);
@@ -496,7 +625,7 @@
       rendimientoCantidad: '', rendimientoUnidad: '', tiempoPrep: '', tiempoCoccion: '', precioVenta: '', foodCost: db.parametros.foodCost,
       alergenos: [], ingredientes: [], procedimiento: '', notas: '', creado: D.ahora(), actualizado: D.ahora()
     };
-    db.recetas.push(r); cambioEstructura(); ir('#receta-' + r.id);
+    db.recetas.push(r); cambioEstructura(); abrir('receta-' + r.id);
     setTimeout(() => { const n = $('f-nombre'); if (n) n.focus(); }, 50);
   }
 
@@ -555,14 +684,14 @@
     ctx.recalcular = () => recalcularReceta(r);
     ctx.alPintar = () => pintarEscalador(r);
     ctx.acciones = {
-      agregarIngrediente: () => { r.ingredientes.push({ tipo: 'insumo', refId: '', cantidad: '', unidad: 'g', nota: '' }); guardar(); render(); const s = document.querySelectorAll('[data-campo="ref"]'); if (s.length) s[s.length - 1].focus(); },
+      agregarIngrediente: () => { r.ingredientes.push({ tipo: 'insumo', refId: '', cantidad: '', unidad: 'g', nota: '' }); guardar(); render(); const s = capaActual().querySelectorAll('[data-campo="ref"]'); if (s.length) s[s.length - 1].focus(); },
       nuevoInsumoAqui: () => abrirInsumo(null, ins => { r.ingredientes.push({ tipo: 'insumo', refId: ins.id, cantidad: '', unidad: C.BASE[C.dimension(ins.unidadCompra)], nota: '' }); cambioEstructura(); render(); }),
       quitarFila: d => { r.ingredientes.splice(+d.i, 1); r.actualizado = D.ahora(); cambioEstructura(); render(); },
-      duplicar: () => { const n = copia(r); n.id = 'rec-' + D.uid(); n.codigo = D.siguienteCodigoReceta(db); n.nombre = (r.nombre || 'Receta') + ' (copia)'; n.creado = n.actualizado = D.ahora(); delete n.ejemplo; db.recetas.push(n); cambioEstructura(); aviso('Receta duplicada'); ir('#receta-' + n.id); },
+      duplicar: () => { const n = copia(r); n.id = 'rec-' + D.uid(); n.codigo = D.siguienteCodigoReceta(db); n.nombre = (r.nombre || 'Receta') + ' (copia)'; n.creado = n.actualizado = D.ahora(); delete n.ejemplo; db.recetas.push(n); cambioEstructura(); aviso('Receta duplicada'); reemplazar('receta-' + n.id); },
       eliminar: () => {
         const u = usosReceta(r.id);
-        if (u.recetas.length || u.servicios.length || u.eventos.length) return abrirModal({ titulo: 'No se puede eliminar', cuerpo: '<p>Esta receta se usa en:</p><ul>' + u.recetas.map(x => '<li>Receta: ' + esc(x.nombre) + '</li>').join('') + u.servicios.map(x => '<li>Servicio: ' + esc(x.nombre) + '</li>').join('') + u.eventos.map(x => '<li>Evento: ' + esc(x.nombre) + '</li>').join('') + '</ul>', botones: [{ texto: 'Entendido', clase: 'primario' }] });
-        confirmar('Eliminar receta', '¿Eliminar <b>' + esc(r.nombre || 'esta receta') + '</b>? No se puede deshacer.', 'Eliminar', () => { db.recetas = db.recetas.filter(x => x.id !== r.id); cambioEstructura(); aviso('Receta eliminada'); ir('#recetas'); });
+        if (u.recetas.length || u.servicios.length || u.eventos.length) return abrirModal({ titulo: 'No se puede eliminar', compacto: true, cuerpo: '<p>Esta receta se usa en:</p><ul>' + u.recetas.map(x => '<li>Receta: ' + esc(x.nombre) + '</li>').join('') + u.servicios.map(x => '<li>Servicio: ' + esc(x.nombre) + '</li>').join('') + u.eventos.map(x => '<li>Evento: ' + esc(x.nombre) + '</li>').join('') + '</ul>', botones: [{ texto: 'Entendido', clase: 'primario' }] });
+        confirmar('Eliminar receta', '¿Eliminar <b>' + esc(r.nombre || 'esta receta') + '</b>? No se puede deshacer.', 'Eliminar', () => { db.recetas = db.recetas.filter(x => x.id !== r.id); cambioEstructura(); aviso('Receta eliminada'); atras(); });
       },
       ficha: () => imprimir(docFichaTecnica(r)),
       escalaAtajo: d => { estadoEscala(r).valor = +d.v; estadoEscala(r).modo = 'porc'; pintarEscalador(r); },
@@ -570,7 +699,7 @@
       compras: () => { const acc = C.explotarPorciones(r, porcionesEscala(r), IX); modalCompras('Lista de compras · ' + (r.nombre || 'Receta') + ' · ' + n0(porcionesEscala(r)) + ' porciones', acc, r.nombre); }
     };
 
-    return '<div class="cabecera"><div><span class="ceja"><a href="#recetas">Recetas</a> / ' + esc(r.codigo) + '</span><h1>' + esc(r.nombre || 'Nueva receta') + '</h1></div>'
+    return '<div class="cabecera"><div><span class="ceja">Receta · ' + esc(r.codigo) + '</span><h1>' + esc(r.nombre || 'Nueva receta') + '</h1></div>'
       + '<div class="acciones"><button class="btn" data-accion="ficha">' + ico('imprimir') + 'Ficha técnica</button><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro" data-accion="eliminar">' + ico('borrar') + 'Eliminar</button></div></div>'
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<section class="panel"><div class="panel-cab"><h2>Datos de la receta</h2></div><div class="campos">'
@@ -618,7 +747,7 @@
     c.lineas.forEach((l, i) => { const el = $('c-ing-' + i); if (el) el.textContent = dinero(l.costo); });
     if ($('c-total')) $('c-total').textContent = dinero(c.total);
     $('resumenReceta').innerHTML = resumenReceta(r, c);
-    const h1 = document.querySelector('.contenido h1'); if (h1) h1.textContent = r.nombre || 'Nueva receta';
+    actualizarTitulo(r.nombre || 'Nueva receta');
     pintarEscalador(r);
   }
 
@@ -687,7 +816,7 @@
   }
   function nuevoServicio(linea) {
     const s = { id: 'srv-' + D.uid(), nombre: '', linea: linea || 'catering', descripcion: '', minimoPersonas: '', margen: db.parametros.margen, extraPorPersona: '', extraConcepto: '', componentes: [], creado: D.ahora(), actualizado: D.ahora() };
-    db.servicios.push(s); cambioEstructura(); ir('#servicio-' + s.id);
+    db.servicios.push(s); cambioEstructura(); abrir('servicio-' + s.id);
     setTimeout(() => { const n = $('f-nombre'); if (n) n.focus(); }, 50);
   }
   const simuladores = {};
@@ -723,27 +852,27 @@
       c2.lineas.forEach((l, i) => { const el = $('c-comp-' + i); if (el) el.textContent = dinero(l.costo); });
       if ($('c-srv')) $('c-srv').textContent = dinero(c2.porPersona);
       $('simServicio').innerHTML = cuerpoSimulador(s, sim);
-      const h1 = document.querySelector('.contenido h1'); if (h1) h1.textContent = s.nombre || 'Nuevo servicio';
+      actualizarTitulo(s.nombre || 'Nuevo servicio');
     };
     ctx.alPintar = () => {
       $('simPersonas').addEventListener('input', e => { sim.personas = C.num(e.target.value); $('simServicio').innerHTML = cuerpoSimulador(s, sim); marcarAtajos(); });
-      const marcarAtajos = () => document.querySelectorAll('#simAtajos button').forEach(b => b.classList.toggle('activo', +b.dataset.v === sim.personas));
+      const marcarAtajos = () => capaActual().querySelectorAll('#simAtajos button').forEach(b => b.classList.toggle('activo', +b.dataset.v === sim.personas));
     };
     ctx.acciones = {
       agregarReceta: () => { s.componentes.push({ tipo: 'receta', refId: '', porcionesPorPersona: 1 }); guardar(); render(); },
       agregarInsumo: () => { s.componentes.push({ tipo: 'insumo', refId: '', cantidad: 1, unidad: 'pza' }); guardar(); render(); },
       quitarFila: d => { s.componentes.splice(+d.i, 1); cambioEstructura(); render(); },
-      simAtajo: d => { sim.personas = +d.v; $('simPersonas').value = d.v; $('simServicio').innerHTML = cuerpoSimulador(s, sim); document.querySelectorAll('#simAtajos button').forEach(b => b.classList.toggle('activo', +b.dataset.v === sim.personas)); },
+      simAtajo: d => { sim.personas = +d.v; $('simPersonas').value = d.v; $('simServicio').innerHTML = cuerpoSimulador(s, sim); capaActual().querySelectorAll('#simAtajos button').forEach(b => b.classList.toggle('activo', +b.dataset.v === sim.personas)); },
       compras: () => modalCompras('Lista de compras · ' + (s.nombre || 'Servicio') + ' · ' + n0(sim.personas) + ' personas', C.explotarServicio(s, sim.personas, IX), s.nombre),
       crearEvento: () => nuevoEvento({ personas: sim.personas, lineas: [{ tipo: 'servicio', refId: s.id, cantidad: '' }], nombre: s.nombre }),
-      duplicar: () => { const n = copia(s); n.id = 'srv-' + D.uid(); n.nombre = (s.nombre || 'Servicio') + ' (copia)'; delete n.ejemplo; db.servicios.push(n); cambioEstructura(); aviso('Servicio duplicado'); ir('#servicio-' + n.id); },
+      duplicar: () => { const n = copia(s); n.id = 'srv-' + D.uid(); n.nombre = (s.nombre || 'Servicio') + ' (copia)'; delete n.ejemplo; db.servicios.push(n); cambioEstructura(); aviso('Servicio duplicado'); reemplazar('servicio-' + n.id); },
       eliminar: () => {
         const ev = db.eventos.filter(e => e.lineas.some(l => l.tipo === 'servicio' && l.refId === s.id));
-        if (ev.length) return abrirModal({ titulo: 'No se puede eliminar', cuerpo: '<p>Este servicio está en ' + ev.length + ' evento(s):</p><ul>' + ev.map(e => '<li>' + esc(e.nombre) + '</li>').join('') + '</ul>', botones: [{ texto: 'Entendido', clase: 'primario' }] });
-        confirmar('Eliminar servicio', '¿Eliminar <b>' + esc(s.nombre || 'este servicio') + '</b>?', 'Eliminar', () => { db.servicios = db.servicios.filter(x => x.id !== s.id); cambioEstructura(); ir('#servicios'); aviso('Servicio eliminado'); });
+        if (ev.length) return abrirModal({ titulo: 'No se puede eliminar', compacto: true, cuerpo: '<p>Este servicio está en ' + ev.length + ' evento(s):</p><ul>' + ev.map(e => '<li>' + esc(e.nombre) + '</li>').join('') + '</ul>', botones: [{ texto: 'Entendido', clase: 'primario' }] });
+        confirmar('Eliminar servicio', '¿Eliminar <b>' + esc(s.nombre || 'este servicio') + '</b>?', 'Eliminar', () => { db.servicios = db.servicios.filter(x => x.id !== s.id); cambioEstructura(); atras(); aviso('Servicio eliminado'); });
       }
     };
-    return '<div class="cabecera"><div><span class="ceja"><a href="#servicios">Servicios</a> / ' + esc(nombreLinea(s.linea)) + '</span><h1>' + esc(s.nombre || 'Nuevo servicio') + '</h1></div>'
+    return '<div class="cabecera"><div><span class="ceja">' + esc(nombreLinea(s.linea)) + '</span><h1>' + esc(s.nombre || 'Nuevo servicio') + '</h1></div>'
       + '<div class="acciones"><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro" data-accion="eliminar">' + ico('borrar') + 'Eliminar</button></div></div>'
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<section class="panel"><h2>Datos del servicio</h2><div class="campos">'
@@ -811,7 +940,7 @@
       lineas: [], personal: [], gastos: [], indirectos: p.indirectos, margen: p.margen, descuento: 0, iva: p.iva, notas: '',
       condiciones: 'Anticipo del 50 % para confirmar la fecha y liquidación 3 días antes del evento. Precios en MXN. Vigencia de 15 días.', creado: D.ahora(), actualizado: D.ahora()
     }, base || {});
-    db.eventos.push(e); cambioEstructura(); ir('#evento-' + e.id);
+    db.eventos.push(e); cambioEstructura(); abrir('evento-' + e.id);
     setTimeout(() => { const n = $('f-nombre'); if (n) { n.focus(); n.select(); } }, 50);
   }
   function vEvento(id) {
@@ -838,13 +967,13 @@
     ctx.recalcular = () => {
       const q2 = C.cotizarEvento(e, IX);
       q2.lineas.forEach((l, i) => { if ($('m-u-' + i)) { $('m-u-' + i).textContent = dinero(l.unitario); $('m-t-' + i).textContent = dinero(l.total); } });
-      document.querySelectorAll('[data-lista="lineas"][data-campo="cantidad"]').forEach(inp => { inp.placeholder = String(C.num(e.personas)); });
+      capaActual().querySelectorAll('[data-lista="lineas"][data-campo="cantidad"]').forEach(inp => { inp.placeholder = String(C.num(e.personas)); });
       e.personal.forEach((p, i) => { if ($('p-t-' + i)) $('p-t-' + i).textContent = dinero(C.num(p.cantidad) * C.num(p.horas) * C.num(p.tarifa)); });
       if ($('t-menu')) $('t-menu').textContent = dinero(q2.alimentos);
       if ($('t-pers')) $('t-pers').textContent = dinero(q2.personal);
       if ($('t-gast')) $('t-gast').textContent = dinero(q2.gastos);
       $('resumenEvento').innerHTML = resumenEvento(e, q2);
-      const h1 = document.querySelector('.contenido h1'); if (h1) h1.textContent = e.nombre || 'Nuevo evento';
+      actualizarTitulo(e.nombre || 'Nuevo evento');
     };
     ctx.acciones = {
       agregarLinea: () => { e.lineas.push({ tipo: 'servicio', refId: '', cantidad: '' }); guardar(); render(); },
@@ -854,12 +983,12 @@
       cotizacion: () => imprimir(docCotizacionCliente(e)),
       costoInterno: () => imprimir(docCostoInterno(e)),
       produccion: () => modalCompras('Producción y compras · ' + (e.nombre || e.folio) + ' · ' + n0(e.personas) + ' personas', C.explotarEvento(e, IX), e.nombre || e.folio, e),
-      duplicar: () => { const n = copia(e); n.id = 'evt-' + D.uid(); n.folio = D.siguienteFolio(db); n.nombre = (e.nombre || 'Evento') + ' (copia)'; n.estatus = 'borrador'; delete n.ejemplo; n.creado = n.actualizado = D.ahora(); db.eventos.push(n); cambioEstructura(); aviso('Evento duplicado como borrador'); ir('#evento-' + n.id); },
-      eliminar: () => confirmar('Eliminar evento', '¿Eliminar <b>' + esc(e.nombre || e.folio) + '</b>?', 'Eliminar', () => { db.eventos = db.eventos.filter(x => x.id !== e.id); cambioEstructura(); ir('#eventos'); aviso('Evento eliminado'); })
+      duplicar: () => { const n = copia(e); n.id = 'evt-' + D.uid(); n.folio = D.siguienteFolio(db); n.nombre = (e.nombre || 'Evento') + ' (copia)'; n.estatus = 'borrador'; delete n.ejemplo; n.creado = n.actualizado = D.ahora(); db.eventos.push(n); cambioEstructura(); aviso('Evento duplicado como borrador'); reemplazar('evento-' + n.id); },
+      eliminar: () => confirmar('Eliminar evento', '¿Eliminar <b>' + esc(e.nombre || e.folio) + '</b>?', 'Eliminar', () => { db.eventos = db.eventos.filter(x => x.id !== e.id); cambioEstructura(); atras(); aviso('Evento eliminado'); })
     };
 
-    return '<div class="cabecera"><div><span class="ceja"><a href="#eventos">Eventos</a> / ' + esc(e.folio) + '</span><h1>' + esc(e.nombre || 'Nuevo evento') + '</h1></div>'
-      + '<div class="acciones"><button class="btn primario" data-accion="cotizacion">' + ico('imprimir') + 'Cotización cliente</button><button class="btn" data-accion="costoInterno">' + ico('imprimir') + 'Costo interno</button><button class="btn" data-accion="produccion">' + ico('lista') + 'Producción y compras</button><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro fantasma" data-accion="eliminar" aria-label="Eliminar evento">' + ico('borrar') + '</button></div></div>'
+    return '<div class="cabecera"><div><span class="ceja">Evento · ' + esc(e.folio) + '</span><h1>' + esc(e.nombre || 'Nuevo evento') + '</h1></div>'
+      + '<div class="acciones"><button class="btn primario" data-accion="cotizacion">' + ico('facturacion') + 'Cotización cliente</button><button class="btn" data-accion="costoInterno">' + ico('imprimir') + 'Costo interno</button><button class="btn" data-accion="produccion">' + ico('lista') + 'Producción y compras</button><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro fantasma" data-accion="eliminar" aria-label="Eliminar evento">' + ico('borrar') + '</button></div></div>'
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<section class="panel"><h2>Datos del evento</h2><div class="campos">'
       + campoTexto('Nombre del evento', 'nombre', e.nombre, { ancho: true, ph: 'Ej. Boda García–López, Capacitación anual' })
@@ -928,55 +1057,101 @@
     });
   }
 
-  /* ================================================================ INICIO (ERP) */
+  /* ================================================================ INICIO
+     Lienzo de íconos: cada uno abre su función como pantalla completa. */
   const DIAS = ['domingo', 'lunes', 'martes', 'miércoles', 'jueves', 'viernes', 'sábado'];
   const MESES_L = ['enero', 'febrero', 'marzo', 'abril', 'mayo', 'junio', 'julio', 'agosto', 'septiembre', 'octubre', 'noviembre', 'diciembre'];
+  function saludoHora() { const h = new Date().getHours(); return h < 12 ? 'Buenos días' : h < 19 ? 'Buenas tardes' : 'Buenas noches'; }
+  function nombreCuenta() { return (perfil && perfil.nombre) || db.empresa.responsable || ''; }
+  function inicial() { const n = nombreCuenta() || (perfil && perfil.correo) || db.empresa.nombre || 'C'; return n.trim().charAt(0).toUpperCase(); }
   function vInicio() {
     const hoy = new Date();
-    const nombre = (perfil && perfil.nombre) || db.empresa.responsable || '';
+    const nombre = nombreCuenta();
     const abiertos = db.eventos.filter(e => ['borrador', 'enviada', 'aprobada'].includes(e.estatus));
-    const montoAbierto = abiertos.reduce((s, e) => s + C.cotizarEvento(e, IX).total, 0);
+    const monto = abiertos.reduce((s, e) => s + C.cotizarEvento(e, IX).total, 0);
+    const semana = db.eventos.filter(e => e.estatus !== 'cancelada' && e.estatus !== 'realizado' && diasHasta(e.fecha) != null && diasHasta(e.fecha) >= 0 && diasHasta(e.fecha) <= 7).length;
     const porSurtir = eventosPorSurtir().length;
     const sinPrecio = db.insumos.filter(i => !(C.num(i.precio) > 0)).length;
-    const bases = db.recetas.filter(r => C.rendimientoBase(r)).length;
-    const pendientesTablero = db.recetas.filter(r => C.costoReceta(r, IX).error).length + (sinPrecio ? 1 : 0);
-    const mod = (href, k, titulo, desc, dato, accion) => '<a class="modulo" href="' + href + '"' + (accion ? ' data-accion="' + accion + '"' : '') + '><span class="modulo-ico">' + ico(k) + '</span><span class="modulo-txt"><b>' + titulo + '</b><span>' + desc + '</span></span><span class="modulo-dato">' + dato + '</span></a>';
-    const prox = (k, titulo, desc) => '<div class="modulo proximo" aria-disabled="true"><span class="modulo-ico">' + ico(k) + '</span><span class="modulo-txt"><b>' + titulo + '</b><span>' + desc + '</span></span><span class="modulo-dato"><span class="pill">Próximamente</span></span></div>';
-    const grupo = (titulo, tiles) => '<section class="grupo-mod"><h2 class="ceja">' + titulo + '</h2><div class="modulos">' + tiles.join('') + '</div></section>';
-
-    const admin = [mod('#tablero', 'tablero', 'Tablero', 'Indicadores, próximos eventos y pendientes', pendientesTablero ? '<span class="pill alerta">' + pendientesTablero + ' pendiente' + (pendientesTablero > 1 ? 's' : '') + '</span>' : '<span class="pill ok">Al día</span>')];
-    if (NUBE && esAdmin()) admin.push(mod('#usuarios', 'usuarios', 'Usuarios', 'Cuentas, roles y solicitudes de acceso', 'Equipo'));
-    if (esAdmin()) admin.push(mod('#ajustes', 'ajustes', 'Ajustes', 'Empresa, IVA, márgenes y respaldos', NUBE ? 'En la nube' : 'Este equipo'));
+    const conError = db.recetas.filter(r => C.costoReceta(r, IX).error).length;
+    const ico2 = (ruta, k, nombreI, insignia, extra) => '<a class="app-ico' + (extra || '') + '" href="#' + ruta + '"><span class="cuadro">' + ico(k) + (insignia ? '<span class="insignia">' + insignia + '</span>' : '') + '</span><span class="nombre">' + nombreI + '</span></a>';
+    const btnIco = (accion, k, nombreI) => '<button type="button" class="app-ico" data-accion="' + accion + '"><span class="cuadro">' + ico(k) + '</span><span class="nombre">' + nombreI + '</span></button>';
+    const prox = (k, nombreI) => '<div class="app-ico proximo" title="Próximamente"><span class="cuadro">' + ico(k) + '</span><span class="nombre">' + nombreI + '</span></div>';
+    const iconos = [
+      ico2('eventos', 'eventos', 'Eventos', abiertos.length || '', ' destacado'),
+      ico2('servicios', 'servicios', 'Servicios'),
+      ico2('recetas', 'recetas', 'Recetas', conError || ''),
+      btnIco('abrirEscalador', 'escalar', 'Escalar'),
+      ico2('compras', 'compras', 'Compras', porSurtir || ''),
+      ico2('insumos', 'insumos', 'Insumos', sinPrecio ? '!' : ''),
+      ico2('tablero', 'tablero', 'Tablero')
+    ];
+    if (NUBE && esAdmin()) iconos.push(ico2('usuarios', 'usuarios', 'Usuarios'));
+    if (esAdmin()) iconos.push(ico2('ajustes', 'ajustes', 'Ajustes'));
+    const resumen = [];
+    if (semana) resumen.push(semana + ' evento' + (semana === 1 ? '' : 's') + ' esta semana');
+    if (abiertos.length) resumen.push(dinero(monto) + ' en cotizaciones');
+    if (!resumen.length) resumen.push(db.recetas.length + ' recetas · ' + db.servicios.length + ' servicios');
 
     ctx.acciones = {
       abrirEscalador: () => abrirEscaladorRapido(),
-      irBusca: d => { if (d.tipo === 'insumo') abrirInsumo(d.id); else ir(d.h); }
+      buscar: () => abrir('buscar'),
+      crear: () => hojaCrear(),
+      cuenta: () => hojaCuenta()
     };
+    return '<div class="inicio"><div class="inicio-barra"><span class="marca">' + ISOTIPO + '<b>CIVIZO</b></span>'
+      + '<button type="button" class="barra-btn" data-accion="buscar" aria-label="Buscar" title="Buscar">' + ico('buscar') + '</button>'
+      + '<button type="button" class="avatar" data-accion="cuenta" aria-label="Tu cuenta" title="Tu cuenta">' + esc(inicial()) + '</button></div>'
+      + '<div class="saludo"><span class="ceja">' + DIAS[hoy.getDay()] + ' ' + hoy.getDate() + ' de ' + MESES_L[hoy.getMonth()] + '</span>'
+      + '<h1>' + saludoHora() + (nombre ? ', <b>' + esc(nombre.split(' ')[0]) + '</b>' : '') + '</h1>'
+      + '<div class="resumen-dia">' + resumen.map(t => '<span><i></i>' + t + '</span>').join('') + '</div></div>'
+      + '<nav class="iconos" aria-label="Funciones">' + iconos.join('') + '</nav>'
+      + '<div class="separador">Próximamente</div><div class="iconos">' + prox('inventario', 'Inventario') + prox('proveedores', 'Proveedores') + prox('facturacion', 'Cobranza') + '</div>'
+      + (D.hayEjemplos(db) && puedeEditar() ? '<div class="aviso-ejemplo"><span>Estás usando datos de ejemplo.</span><button class="btn chico" data-accion="quitarEjemplos">Borrarlos</button></div>' : '')
+      + '</div>'
+      + (puedeEditar() ? '<button type="button" class="fab" data-accion="crear" aria-label="Crear" title="Crear">' + ico('mas') + '</button>' : '');
+  }
+  function hojaCrear() {
+    const op = [['nuevoEvento', 'eventos', 'Evento'], ['nuevaReceta', 'recetas', 'Receta'], ['nuevoServicio', 'servicios', 'Servicio'], ['nuevoInsumo', 'insumos', 'Insumo']];
+    abrirModal({
+      titulo: 'Crear', compacto: true,
+      cuerpo: '<div class="hoja-iconos">' + op.map(o => '<button type="button" data-crear="' + o[0] + '">' + ico(o[1]) + o[2] + '</button>').join('') + '</div>',
+      alAbrir: c => c.addEventListener('click', ev => { const b = ev.target.closest('[data-crear]'); if (b) ACCIONES_GLOBALES[b.dataset.crear]({}); })
+    });
+  }
+  function hojaCuenta() {
+    const rolN = NUBE ? ((N.ROLES.find(r => r.id === rol()) || {}).nombre || '') : 'Modo local · este equipo';
+    const op = [];
+    if (NUBE && esAdmin()) op.push(['usuarios', 'usuarios', 'Usuarios']);
+    if (esAdmin()) op.push(['ajustes', 'ajustes', 'Ajustes']);
+    op.push(['tema', 'tablero', 'Cambiar apariencia']);
+    if (NUBE) op.push(['salir', 'salir', 'Cerrar sesión', 'peligro']);
+    abrirModal({
+      titulo: 'Tu cuenta', compacto: true,
+      cuerpo: '<div class="cuenta-cab"><span class="avatar">' + esc(inicial()) + '</span><div><b>' + esc(nombreCuenta() || (perfil && perfil.correo) || db.empresa.nombre) + '</b><span class="tenue">' + esc(rolN) + (perfil && perfil.correo ? ' · ' + esc(perfil.correo) : '') + '</span></div></div>'
+        + '<div class="lista-opc">' + op.map(o => '<button type="button" data-op="' + o[0] + '" class="' + (o[3] || '') + '">' + ico(o[1]) + o[2] + '</button>').join('') + '</div>',
+      alAbrir: c => c.addEventListener('click', ev => {
+        const b = ev.target.closest('[data-op]'); if (!b) return;
+        const o = b.dataset.op;
+        if (o === 'usuarios' || o === 'ajustes') abrir(o);
+        else if (o === 'tema') { const actual = document.documentElement.getAttribute('data-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'); aplicarTema(actual === 'dark' ? 'light' : 'dark', true); }
+        else if (o === 'salir') { cerrarModal(); if (N.hayPendientes(db)) confirmar('Hay cambios sin subir', 'Algunos cambios todavía no llegan a la nube. Si sales ahora se pierden.', 'Salir de todos modos', salir); else salir(); }
+      })
+    });
+  }
+  let textoBusqueda = '';
+  function vBuscar() {
     ctx.alPintar = () => {
       const inp = $('buscaGlobal');
-      inp.addEventListener('input', () => { $('resBusca').innerHTML = resultadosBusqueda(inp.value); });
+      inp.value = textoBusqueda;
+      $('resBusca').innerHTML = resultadosBusqueda(textoBusqueda);
+      inp.addEventListener('input', () => { textoBusqueda = inp.value; $('resBusca').innerHTML = resultadosBusqueda(inp.value); });
       inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { const p = $('resBusca').querySelector('[data-accion]'); if (p) p.click(); } });
+      setTimeout(() => { if (capaActual().contains(inp) && !textoBusqueda) inp.focus(); }, 280);
     };
-    const rapidas = puedeEditar()
-      ? '<button class="btn primario" data-accion="nuevoEvento">' + ico('mas') + 'Nuevo evento</button><button class="btn" data-accion="nuevaReceta">' + ico('mas') + 'Nueva receta</button><button class="btn" data-accion="nuevoInsumo">' + ico('mas') + 'Nuevo insumo</button><button class="btn" data-accion="nuevoServicio">' + ico('mas') + 'Nuevo servicio</button>'
-      : '';
-    return '<div class="bienvenida"><span class="ceja">' + DIAS[hoy.getDay()] + ' ' + hoy.getDate() + ' de ' + MESES_L[hoy.getMonth()] + '</span>'
-      + '<h1>' + (nombre ? 'Hola, ' + esc(nombre.split(' ')[0]) : 'Bienvenido a ' + esc(db.empresa.nombre || 'CIVIZO')) + '</h1><p class="sub">¿Qué quieres hacer hoy?</p>'
-      + '<div class="buscador"><span class="buscador-ico">' + ico('buscar') + '</span><input type="search" id="buscaGlobal" placeholder="Buscar receta, insumo, servicio, evento o cliente" autocomplete="off" aria-label="Buscar en toda la plataforma"><div class="resultados" id="resBusca"></div></div>'
-      + '<div class="acciones">' + rapidas + '<button class="btn" data-accion="abrirEscalador">' + ico('escalar') + 'Escalar receta</button></div></div>'
-      + bannerEjemplo()
-      + grupo('Ventas y servicio', [
-        mod('#eventos', 'eventos', 'Eventos y cotizaciones', 'Cotiza con costo interno, utilidad y precio por persona', '<b>' + abiertos.length + '</b> abierto' + (abiertos.length === 1 ? '' : 's') + ' · ' + dinero(montoAbierto)),
-        mod('#servicios', 'servicios', 'Servicios', 'Tu catálogo por línea de negocio, costeado por persona', '<b>' + db.servicios.length + '</b> en catálogo')
-      ])
-      + grupo('Cocina y producción', [
-        mod('#recetas', 'recetas', 'Recetas estandarizadas', 'Fichas técnicas con costo, procedimiento y alérgenos', '<b>' + db.recetas.length + '</b> recetas · ' + bases + ' bases'),
-        mod('#recetas', 'escalar', 'Escalador', 'Cantidades y costo para 1 o para 1,000 porciones', 'Calcular', 'abrirEscalador'),
-        mod('#compras', 'compras', 'Producción y compras', 'Lista de compras consolidada de tus próximos eventos', '<b>' + porSurtir + '</b> evento' + (porSurtir === 1 ? '' : 's') + ' por surtir'),
-        mod('#insumos', 'insumos', 'Insumos', 'Precios, presentaciones, merma y proveedores', '<b>' + db.insumos.length + '</b>' + (sinPrecio ? ' · <span class="pill alerta">' + sinPrecio + ' sin precio</span>' : ''))
-      ])
-      + grupo('Administración', admin)
-      + grupo('En camino', [prox('inventario', 'Inventario', 'Existencias, entradas y salidas de almacén'), prox('proveedores', 'Proveedores', 'Comparativo de precios e historial de compras'), prox('facturacion', 'Cobranza', 'Anticipos, saldos y facturas por evento')]);
+    ctx.acciones = { irBusca: d => { if (d.tipo === 'insumo') abrirInsumo(d.id); else abrir(d.h); } };
+    return '<div class="cabecera"><div><h1>Buscar</h1></div></div>'
+      + '<div class="busqueda-campo">' + ico('buscar') + '<input type="search" id="buscaGlobal" placeholder="Receta, insumo, servicio, evento o cliente" autocomplete="off" aria-label="Buscar en toda la plataforma"></div>'
+      + '<div class="resultados" id="resBusca"></div>';
   }
   function resultadosBusqueda(q) {
     q = norm(q);
@@ -992,9 +1167,9 @@
   function abrirEscaladorRapido() {
     if (!db.recetas.length) return aviso('Primero crea una receta', true);
     abrirModal({
-      titulo: 'Escalar una receta',
+      titulo: 'Escalar una receta', compacto: true,
       cuerpo: '<div class="campos"><label class="campo ancho"><span>Receta</span><select id="erReceta">' + db.recetas.slice().sort(sortNombre).map(r => '<option value="' + r.id + '">' + esc(r.nombre) + '</option>').join('') + '</select></label><label class="campo"><span>Porciones</span><input id="erPorc" type="text" inputmode="decimal" value="100"></label></div><p class="tenue">Te llevamos a la receta con las cantidades, el costo, la orden de producción y la lista de compras.</p>',
-      botones: [{ texto: 'Cancelar', clase: 'fantasma' }, { texto: 'Calcular', clase: 'primario', accion: c => { const id = c.querySelector('#erReceta').value, v = C.num(c.querySelector('#erPorc').value); escalas[id] = { valor: v > 0 ? v : 100, modo: 'porc' }; setTimeout(() => ir('#receta-' + id), 0); } }]
+      botones: [{ texto: 'Cancelar', clase: 'fantasma' }, { texto: 'Calcular', clase: 'primario', accion: c => { const id = c.querySelector('#erReceta').value, v = C.num(c.querySelector('#erPorc').value); escalas[id] = { valor: v > 0 ? v : 100, modo: 'porc' }; abrir('receta-' + id); } }]
     });
   }
 
@@ -1042,7 +1217,7 @@
     ctx.alPintar = () => {
       $('cDesde').addEventListener('change', ev => { e.desde = ev.target.value; render(); });
       $('cHasta').addEventListener('change', ev => { e.hasta = ev.target.value; render(); });
-      document.querySelectorAll('[data-est]').forEach(ch => ch.addEventListener('change', () => { e.est = Array.from(document.querySelectorAll('[data-est]:checked')).map(x => x.value); render(); }));
+      capaActual().querySelectorAll('[data-est]').forEach(ch => ch.addEventListener('change', () => { e.est = Array.from(capaActual().querySelectorAll('[data-est]:checked')).map(x => x.value); render(); }));
     };
     return '<div class="cabecera"><div><span class="ceja">Cocina y producción</span><h1>Producción y compras</h1><p class="sub">Junta todo lo que hay que preparar y comprar para los eventos de un periodo. Cada receta y sub-receta se escala y se suma con su merma.</p></div>'
       + '<div class="acciones"><button class="btn" data-accion="csvCompras">' + ico('bajar') + 'Descargar CSV</button><button class="btn primario" data-accion="imprimirCompras">' + ico('imprimir') + 'Imprimir</button></div></div>'
@@ -1112,17 +1287,16 @@
   }
 
   /* ---------------------------------------------------------- Solo lectura */
-  const ACC_LECTURA = new Set(['ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ACC_LECTURA = new Set(['buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
   const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
   function aplicarSoloLectura() {
-    document.querySelectorAll('#vista input, #vista select, #vista textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
-    document.querySelectorAll('#vista [data-accion]').forEach(el => { if (!ACC_LECTURA.has(el.dataset.accion)) el.hidden = true; });
+    capaActual().querySelectorAll('input, select, textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
+    capaActual().querySelectorAll('[data-accion]').forEach(el => { if (!ACC_LECTURA.has(el.dataset.accion)) el.hidden = true; });
   }
 
   /* ============================================================ Nube: acceso */
   function pantallaAcceso(modo, error) {
     modo = modo || 'entrar';
-    document.querySelector('.app').classList.add('sin-sesion');
     const registro = modo === 'registro';
     $('vista').innerHTML = '<div class="acceso"><form class="acceso-tarjeta" id="fAcceso" novalidate>'
       + '<div class="acceso-marca">' + ISOTIPO + '<div><b>CIVIZO</b><small>Servicios alimentarios</small></div></div>'
@@ -1153,11 +1327,10 @@
     setTimeout(() => $('aCorreo').focus(), 30);
   }
   function pantallaMensaje(titulo, texto, botones) {
-    document.querySelector('.app').classList.add('sin-sesion');
     $('vista').innerHTML = '<div class="acceso"><div class="acceso-tarjeta"><div class="acceso-marca">' + ISOTIPO + '<div><b>CIVIZO</b><small>Servicios alimentarios</small></div></div><h1>' + titulo + '</h1><p class="sub">' + texto + '</p><div class="acceso-pie" id="msjBotones"></div></div></div>';
     (botones || []).forEach(b => { const el = document.createElement('button'); el.type = 'button'; el.className = 'btn ' + (b.clase || ''); el.textContent = b.texto; el.onclick = b.accion; $('msjBotones').appendChild(el); });
   }
-  function salir() { N.salir(); perfil = null; db = D.vacio(); reindexar(); pintarCuenta(); pantallaAcceso(); }
+  function salir() { N.salir(); perfil = null; db = D.vacio(); reindexar(); pila = []; entradas = 0; history.replaceState(estadoHist(), '', urlDe()); pantallaAcceso(); }
   async function entrarConSesion(nombre) {
     pantallaMensaje('Conectando…', 'Descargando la información de tu cocina.');
     try {
@@ -1168,9 +1341,8 @@
       }
       db = D.normalizar(await N.cargarTodo(D.vacio));
       N.fijarBase(db); reindexar();
-      document.querySelector('.app').classList.remove('sin-sesion');
-      pintarCuenta();
-      rutaPrevia = ''; render();
+      $('vista').innerHTML = '';
+      iniciarPila();
       iniciarSondeo();
       if (perfil.primero) bienvenidaDueno();
     } catch (e) {
@@ -1196,7 +1368,7 @@
     const loc = datosLocalesGuardados();
     const cuantos = loc ? loc.insumos.length + loc.recetas.length + loc.servicios.length + loc.eventos.length : 0;
     abrirModal({
-      titulo: 'Eres el dueño de esta cocina',
+      titulo: 'Eres el dueño de esta cocina', compacto: true,
       cuerpo: '<p>Tu cuenta es la primera del proyecto, así que tiene todos los permisos. Las demás personas que se registren quedarán por aprobar en <b>Usuarios</b>.</p>'
         + (cuantos ? '<div class="nota acento">Este navegador tiene <b>' + cuantos + ' elementos</b> capturados en modo local. Puedes subirlos a la nube ahora.</div>' : '<p>La nube está vacía. Puedes empezar a capturar o cargar los datos de ejemplo.</p>'),
       botones: cuantos
@@ -1226,23 +1398,19 @@
   document.addEventListener('visibilitychange', () => { if (!document.hidden) sondear(); });
   window.addEventListener('beforeunload', ev => { if (NUBE && perfil && N.hayPendientes(db)) { ev.preventDefault(); ev.returnValue = ''; } });
 
-  function pintarCuenta() {
-    let el = $('cuentaLateral');
-    if (!el) { el = document.createElement('div'); el.id = 'cuentaLateral'; el.className = 'cuenta-lateral'; $('estadoGuardado').before(el); }
-    if (!NUBE) { el.innerHTML = ''; el.hidden = true; return; }
-    el.hidden = !perfil;
-    if (!perfil) return;
-    el.innerHTML = '<span class="cuenta-txt"><b>' + esc(perfil.nombre || perfil.correo) + '</b><small>' + esc((N.ROLES.find(r => r.id === perfil.rol) || {}).nombre || '') + '</small></span><button type="button" class="icono-btn salir" id="btnSalir" aria-label="Cerrar sesión" title="Cerrar sesión">' + ico('salir') + '</button>';
-    $('btnSalir').onclick = () => { if (N.hayPendientes(db)) return confirmar('Hay cambios sin subir', 'Algunos cambios todavía no llegan a la nube. Si sales ahora se pierden.', 'Salir de todos modos', salir); salir(); };
+  function iniciarPila() {
+    const h = limpiar(location.hash);
+    pila = h && h !== 'inicio' ? [h] : [];
+    entradas = 0;
+    history.replaceState(estadoHist(), '', urlDe());
+    pintar('reemplazo');
   }
   function arrancar() {
-    if (!NUBE) { $('estadoGuardado').textContent = 'Modo local · guardado en este equipo'; render(); return; }
-    N.alEstado((estado, err) => {
-      const el = $('estadoGuardado');
-      const txt = { pendiente: 'Guardando en la nube…', ok: 'Guardado en la nube · ' + new Date().toLocaleTimeString('es-MX', { hour: '2-digit', minute: '2-digit' }), error: 'Sin conexión: se reintentará solo', 'sin-permiso': 'Tu cuenta no tiene permiso para guardar' }[estado];
-      el.textContent = txt; el.classList.toggle('error', estado === 'error' || estado === 'sin-permiso');
+    if (!NUBE) { iniciarPila(); return; }
+    N.alEstado(estado => {
+      const txt = { pendiente: 'Guardando…', ok: 'Guardado en la nube', error: 'Sin conexión · se reintentará', 'sin-permiso': 'Tu cuenta no tiene permiso para guardar' }[estado];
+      mostrarEstado(estado === 'ok' ? 'ok' : estado === 'pendiente' ? 'pendiente' : 'error', txt);
       if (estado === 'sin-permiso') aviso('Tu cuenta no tiene permiso para guardar cambios', true);
-      void err;
     });
     if (!N.sesion()) return pantallaAcceso();
     entrarConSesion();
@@ -1261,7 +1429,7 @@
       restaurar: () => elegirArchivo('.json,application/json', txt => {
         let d; try { d = JSON.parse(txt); } catch (er) { return aviso('El archivo no es un respaldo válido', true); }
         if (!d || !Array.isArray(d.recetas) || !Array.isArray(d.insumos)) return aviso('El archivo no parece un respaldo de CIVIZO', true);
-        confirmar('Restaurar respaldo', 'Se reemplazará toda la información actual por la del archivo (' + d.recetas.length + ' recetas, ' + d.insumos.length + ' insumos, ' + (d.eventos || []).length + ' eventos). ¿Continuar?', 'Restaurar', () => { db = D.normalizar(d); cambioEstructura(); aviso('Respaldo restaurado'); ir('#inicio'); });
+        confirmar('Restaurar respaldo', 'Se reemplazará toda la información actual por la del archivo (' + d.recetas.length + ' recetas, ' + d.insumos.length + ' insumos, ' + (d.eventos || []).length + ' eventos). ¿Continuar?', 'Restaurar', () => { db = D.normalizar(d); cambioEstructura(); aviso('Respaldo restaurado'); irInicio(); });
       }),
       cargarEjemplo: () => confirmar('Cargar datos de ejemplo', 'Se agregarán los insumos, recetas, servicios y el evento de ejemplo a tu información actual.', 'Agregar', () => {
         const ej = D.ejemplo();
@@ -1270,7 +1438,7 @@
       }),
       subirLocal: () => confirmar('Subir a la nube', 'Se agregarán a la nube los insumos, recetas, servicios y eventos guardados en este navegador que todavía no estén en ella. No se borra nada.', 'Subir', subirDatosLocales),
       borrarTodo: () => confirmar('Borrar toda la información', NUBE ? 'Se borrarán todos los insumos, recetas, servicios y eventos <b>para todas las cuentas</b>. Descarga un respaldo antes.' : 'Se borrarán todos los insumos, recetas, servicios y eventos de este equipo. Descarga un respaldo antes si lo necesitas.', 'Borrar todo', () => {
-        const e = db.empresa, p = db.parametros; db = D.vacio(); db.empresa = e; db.parametros = p; cambioEstructura(); aviso('Información borrada'); ir('#inicio');
+        const e = db.empresa, p = db.parametros; db = D.vacio(); db.empresa = e; db.parametros = p; cambioEstructura(); aviso('Información borrada'); irInicio();
       })
     };
     return '<div class="cabecera"><div><span class="ceja">Configuración</span><h1>Ajustes</h1><p class="sub">Datos de tu empresa para los documentos, valores por omisión y respaldos.</p></div></div>'
@@ -1296,8 +1464,8 @@
   }
   try { aplicarTema(localStorage.getItem('civizo.tema') || '', false); } catch (e) { /* */ }
 
-  function noEncontrado(que, href, txt) {
-    return '<div class="vacio"><h3>' + que + ' no existe</h3><p>Quizá se eliminó o el enlace está incompleto.</p><a class="btn primario" href="' + href + '">' + txt + '</a></div>';
+  function noEncontrado(que) {
+    return '<div class="vacio"><h3>' + que + ' ya no existe</h3><p>Quizá se eliminó o el enlace está incompleto.</p><button type="button" class="btn primario" data-nav="atras">Regresar</button></div>';
   }
 
   /* --------------------------------------------------- Acciones globales */
@@ -1307,7 +1475,7 @@
     nuevoServicio: d => nuevoServicio(d.linea),
     nuevoInsumo: () => abrirInsumo(null),
     editarInsumo: d => abrirInsumo(d.id),
-    verLinea: d => { filtros.servicios.linea = d.linea; ir('#servicios'); },
+    verLinea: d => { filtros.servicios.linea = d.linea; abrir('servicios'); },
     quitarEjemplos: () => confirmar('Borrar datos de ejemplo', 'Se borrarán los insumos, recetas, servicios y el evento de ejemplo. Lo que tú hayas creado se queda.', 'Borrar ejemplos', () => {
       D.quitarEjemplos(db); cambioEstructura(); aviso('Datos de ejemplo borrados'); render();
     })
