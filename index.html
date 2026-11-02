@@ -1,0 +1,43 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CIVIZO Cocina</title>
+<meta name="description" content="Costeo de servicios de alimentos y eventos, recetas estandarizadas y escalado de producción.">
+<meta name="theme-color" content="#2B2B2B">
+<link rel="icon" type="image/png" href="assets/marca/favicon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Poppins:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/civizo.css">
+</head>
+<body>
+<div class="app">
+  <aside class="lateral" aria-label="Menú principal">
+    <a class="marca" href="#inicio" aria-label="CIVIZO, ir al tablero">
+      <svg class="isotipo" viewBox="215 85 370 135" aria-hidden="true"><g fill="none" stroke-linecap="round"><g class="fig"><circle cx="260" cy="100" r="12" stroke="none"/><path d="M238 159 Q240 127 260 127 Q280 127 282 159" stroke-width="10"/><circle cx="330" cy="100" r="12" stroke="none"/><path d="M308 159 Q310 127 330 127 Q350 127 352 159" stroke-width="10"/><circle cx="470" cy="100" r="12" stroke="none"/><path d="M448 159 Q450 127 470 127 Q490 127 492 159" stroke-width="10"/><circle cx="540" cy="100" r="12" stroke="none"/><path d="M518 159 Q520 127 540 127 Q560 127 562 159" stroke-width="10"/></g><g class="acento"><circle cx="400" cy="100" r="12" stroke="none"/><path d="M378 159 Q380 127 400 127 Q420 127 422 159" stroke-width="10"/><path d="M225 178 Q400 212 575 178" stroke-width="8"/></g></g></svg>
+      <span class="marca-txt"><b>CIVIZO</b><small>Servicios alimentarios</small></span>
+    </a>
+    <nav class="menu" id="menu"></nav>
+    <div class="lateral-pie" id="estadoGuardado" aria-live="polite">Guardado en este equipo</div>
+  </aside>
+  <main class="principal" id="vista" tabindex="-1"></main>
+</div>
+
+<div class="modal-fondo" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <header class="modal-cab"><h2 id="modalTitulo"></h2><button class="icono-btn" type="button" data-cerrar aria-label="Cerrar">✕</button></header>
+    <div class="modal-cuerpo" id="modalCuerpo"></div>
+    <footer class="modal-pie" id="modalPie"></footer>
+  </div>
+</div>
+<div class="aviso" id="aviso" role="status" hidden></div>
+<div id="impresion" aria-hidden="true"></div>
+
+<script src="js/costeo.js"></script>
+<script src="js/datos.js"></script>
+<script src="js/app.js"></script>
+</body>
+</html>

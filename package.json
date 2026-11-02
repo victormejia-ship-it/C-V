@@ -1,0 +1,6 @@
+{
+  "name": "civizo-cocina",
+  "private": true,
+  "description": "CIVIZO · costeo de servicios de alimentos y eventos, recetas estandarizadas",
+  "scripts": { "test": "node tests/prueba_costeo.js" }
+}
