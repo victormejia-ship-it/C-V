@@ -57,7 +57,7 @@
     return {
       version: 1,
       empresa: { nombre: 'CIVIZO', lema: 'Servicios Alimentarios', responsable: '', telefono: '', correo: '', ciudad: 'Monterrey, N.L.' },
-      parametros: { iva: 16, margen: 35, foodCost: 30, indirectos: 8 },
+      parametros: { iva: 16, margen: 35, foodCost: 30, indirectos: 8, diasVigencia: 30 },
       insumos: [], recetas: [], servicios: [], eventos: []
     };
   }
@@ -70,6 +70,7 @@
     out.empresa = Object.assign(vacio().empresa, d.empresa || {});
     out.parametros = Object.assign(vacio().parametros, d.parametros || {});
     ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+    out.insumos.forEach(i => { if (!Array.isArray(i.cotizaciones)) i.cotizaciones = []; if (!Array.isArray(i.historial)) i.historial = []; });
     out.recetas.forEach(r => { r.ingredientes = r.ingredientes || []; r.alergenos = r.alergenos || []; });
     out.servicios.forEach(s => { s.componentes = s.componentes || []; });
     out.eventos.forEach(e => { e.lineas = e.lineas || []; e.personal = e.personal || []; e.gastos = e.gastos || []; });
@@ -109,7 +110,9 @@
     const t = ahora();
     const I = {};
     const ins = (clave, nombre, categoria, precio, presentacion, unidadCompra, rendimiento, proveedor) => {
-      const x = { id: 'ins-' + clave, nombre, categoria, precio, presentacion, unidadCompra, rendimiento, proveedor: proveedor || '', actualizado: t, ejemplo: true };
+      const x = { id: 'ins-' + clave, nombre, categoria, precio, presentacion, unidadCompra, rendimiento, proveedor: proveedor || '', actualizado: t, ejemplo: true,
+        cotizaciones: proveedor ? [{ id: 'q-' + clave, fuente: proveedor, precio, presentacion, unidad: unidadCompra, fecha: t, nota: 'Precio de referencia de ejemplo' }] : [],
+        historial: [{ fecha: t, precio, presentacion, unidadCompra, fuente: proveedor || '' }] };
       I[clave] = x.id; d.insumos.push(x);
     };
     ins('arroz', 'Arroz grano largo', 'Abarrotes', 32, 1, 'kg', 100, 'Central de Abastos');
@@ -144,6 +147,10 @@
     ins('servilleta', 'Servilleta', 'Desechables', 45, 500, 'pza', 100, 'Desechables MTY');
     ins('cubiertos', 'Juego de cubiertos', 'Desechables', 150, 50, 'pza', 100, 'Desechables MTY');
 
+    const masCot = (clave, lista) => { const x = d.insumos.find(i => i.id === 'ins-' + clave); lista.forEach(([fuente, precio, presentacion, unidad], k) => x.cotizaciones.push({ id: 'q-' + clave + k, fuente, precio, presentacion, unidad, fecha: t, nota: 'Precio de referencia de ejemplo' })); };
+    masCot('arroz', [['Walmart', 36.5, 1, 'kg'], ['Soriana', 34.9, 1, 'kg'], ['Costco', 189, 7, 'kg']]);
+    masCot('pollo', [['Walmart', 149, 1, 'kg'], ['Costco', 699, 5, 'kg']]);
+    masCot('aceite', [['Walmart', 52, 1, 'l'], ['Soriana', 129, 3, 'l']]);
     const R = {};
     let n = 0;
     const rec = (clave, o) => {

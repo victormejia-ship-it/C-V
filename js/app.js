@@ -92,6 +92,9 @@
     bajar: '<path d="M12 4v11M7 10l5 5 5-5M4 20h16"/>',
     subir: '<path d="M12 20V9M7 14l5-5 5 5M4 4h16"/>',
     escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>',
+    externo: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
+    check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    etiqueta: '<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.4"/>',
     tablero: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     compras: '<path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
     usuarios: '<circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/>',
@@ -168,7 +171,7 @@
   let pila = [];
   let entradas = 0;
   const limpiar = h => decodeURIComponent(String(h || '').replace(/^#/, ''));
-  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
+  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento|insumo)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
   const tope = () => pila.length ? pila[pila.length - 1] : 'inicio';
   const urlDe = () => pila.length ? '#' + tope() : location.pathname + location.search;
   function estadoHist() { return { civizo: true, pila: pila.slice(), entradas }; }
@@ -258,7 +261,7 @@
     const c = capaActual();
     if (!c || !c.classList.contains('capa')) return pintar('reemplazo');
     const ruta = c.dataset.ruta, r = rutaDe(ruta);
-    const vistas = { tablero: vTablero, insumos: vInsumos, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
+    const vistas = { tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
     if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; }
     if (!NUBE) delete vistas.usuarios;
     ctx = { obj: null, recalcular: null, acciones: {} };
@@ -424,8 +427,8 @@
     // Alertas
     const alertas = [];
     if (sinPrecio) alertas.push(['alerta', sinPrecio + ' insumo' + (sinPrecio > 1 ? 's' : '') + ' sin precio', '#insumos', 'Capturar']);
-    const viejos = db.insumos.filter(i => i.actualizado && (Date.now() - new Date(i.actualizado)) > 90 * 864e5).length;
-    if (viejos) alertas.push(['info', viejos + ' insumo' + (viejos > 1 ? 's' : '') + ' sin actualizar precio en 3 meses', '#insumos', 'Revisar']);
+    const viejos = db.insumos.filter(i => i.actualizado && (Date.now() - new Date(i.actualizado)) > vigencia() * 864e5).length;
+    if (viejos) alertas.push(['info', viejos + ' insumo' + (viejos > 1 ? 's' : '') + ' sin revisar precio en más de ' + vigencia() + ' días', '#precios', 'Actualizar']);
     db.recetas.forEach(r => {
       const c = C.costoReceta(r, IX);
       if (c.error) alertas.push(['error', esc(r.nombre) + ': ' + esc(c.error), '#receta-' + r.id, 'Corregir']);
@@ -486,17 +489,17 @@
     const q = f.q.toLowerCase();
     const lista = db.insumos.filter(i => (!f.cat || i.categoria === f.cat) && (!q || (i.nombre + ' ' + (i.proveedor || '')).toLowerCase().includes(q))).sort((a, b) => String(a.categoria).localeCompare(String(b.categoria), 'es') || sortNombre(a, b));
     const filas = lista.map(i => {
-      const u = usosInsumo(i.id);
-      const nUsos = u.recetas.length + u.servicios.length;
-      const sinP = !(C.num(i.precio) > 0);
-      return '<tr class="clic" tabindex="0" data-accion="editarInsumo" data-id="' + i.id + '"><td><b>' + esc(i.nombre) + '</b>' + (i.proveedor ? '<br><span class="tenue">' + esc(i.proveedor) + '</span>' : '') + '</td><td>' + esc(i.categoria || '—') + '</td>'
-        + '<td class="num">' + C.fmtCant(i.presentacion) + ' ' + esc(C.nombreUnidad(i.unidadCompra)) + '</td><td class="num">' + (sinP ? '<span class="pill alerta">Sin precio</span>' : dinero(i.precio)) + '</td>'
-        + '<td class="num">' + (C.num(i.rendimiento) > 0 && C.num(i.rendimiento) < 100 ? '<span class="pill">' + C.num(i.rendimiento) + ' %</span>' : '100 %') + '</td><td class="num"><b>' + costoNetoTexto(i) + '</b></td>'
-        + '<td class="num">' + (nUsos ? nUsos : '<span class="tenue">—</span>') + '</td><td class="tenue">' + fechaCorta(i.actualizado) + '</td></tr>';
+      const nc = (i.cotizaciones || []).length;
+      return '<tr class="clic" tabindex="0" data-ir="#insumo-' + i.id + '"><td><b>' + esc(i.nombre) + '</b><br><span class="tenue">' + esc(i.categoria || 'Sin categoría') + (i.proveedor ? ' · ' + esc(i.proveedor) : '') + '</span></td>'
+        + '<td class="num">' + (C.num(i.precio) > 0 ? dinero(i.precio) : '—') + '<br><span class="tenue">' + C.fmtCant(i.presentacion) + ' ' + esc(C.nombreUnidad(i.unidadCompra)) + '</span></td>'
+        + '<td class="num"><b>' + costoNetoTexto(i) + '</b>' + (C.num(i.rendimiento) > 0 && C.num(i.rendimiento) < 100 ? '<br><span class="tenue">rinde ' + C.num(i.rendimiento) + ' %</span>' : '') + '</td>'
+        + '<td class="num">' + (nc ? nc : '<span class="tenue">—</span>') + '</td><td>' + pillEdad(i) + '</td></tr>';
     }).join('');
 
     ctx.acciones = {
       importarCSV: () => elegirArchivo('.csv,text/csv', importarInsumosCSV),
+      irPrecios: () => abrir('precios'),
+      importarFactura: () => importarFactura(),
       exportarCSV: () => descargar('insumos-civizo.csv', csv([['nombre', 'categoria', 'precio', 'presentacion', 'unidad', 'rendimiento', 'proveedor']].concat(db.insumos.slice().sort(sortNombre).map(i => [i.nombre, i.categoria, i.precio, i.presentacion, i.unidadCompra, i.rendimiento, i.proveedor]))), 'text/csv')
     };
     ctx.alPintar = () => {
@@ -506,9 +509,9 @@
     const refrescarLista = () => { const pos = $('fq').selectionStart; render(); $('fq').focus(); try { $('fq').setSelectionRange(pos, pos); } catch (e) { /* */ } };
 
     return '<div class="cabecera"><div><span class="ceja">Catálogo</span><h1>Insumos</h1><p class="sub">Todo lo que compras, con su presentación, precio y merma. El costo neto ya descuenta lo que se pierde al limpiar y porcionar.</p></div>'
-      + '<div class="acciones"><button class="btn" data-accion="importarCSV">' + ico('subir') + 'Importar CSV</button><button class="btn" data-accion="exportarCSV">' + ico('bajar') + 'Exportar</button><button class="btn primario" data-accion="nuevoInsumo">' + ico('mas') + 'Nuevo insumo</button></div></div>'
+      + '<div class="acciones"><button class="btn primario" data-accion="irPrecios">' + ico('etiqueta') + 'Actualizar precios</button><button class="btn" data-accion="importarFactura">' + ico('facturacion') + 'Importar factura</button><button class="btn" data-accion="importarCSV">' + ico('subir') + 'Importar CSV</button><button class="btn" data-accion="exportarCSV">' + ico('bajar') + 'Exportar</button><button class="btn" data-accion="nuevoInsumo">' + ico('mas') + 'Nuevo insumo</button></div></div>'
       + '<section class="panel"><div class="filtros"><input type="search" id="fq" placeholder="Buscar insumo o proveedor" value="' + esc(f.q) + '" aria-label="Buscar"><select id="fcat" aria-label="Categoría"><option value="">Todas las categorías</option>' + cats.map(c => '<option' + (c === f.cat ? ' selected' : '') + '>' + esc(c) + '</option>').join('') + '</select></div>'
-      + (lista.length ? '<div class="tabla-env"><table><thead><tr><th>Insumo</th><th>Categoría</th><th class="num">Compra</th><th class="num">Precio</th><th class="num">Rendimiento</th><th class="num">Costo neto</th><th class="num">Usos</th><th>Actualizado</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+      + (lista.length ? '<div class="tabla-env"><table><thead><tr><th>Insumo</th><th class="num">Precio</th><th class="num">Costo aprovechable</th><th class="num">Cotizaciones</th><th>Revisado</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
         : '<div class="vacio"><h3>' + (db.insumos.length ? 'Ningún insumo coincide' : 'Aún no hay insumos') + '</h3><p>Da de alta lo que compras: arroz por kilo, aceite por litro, tortillas por kilo, desechables por paquete.</p><button class="btn primario" data-accion="nuevoInsumo">' + ico('mas') + 'Nuevo insumo</button></div>')
       + '<p class="tenue">Tip: el rendimiento es la parte aprovechable. Si de 1 kg de cebolla te quedan 850 g limpios, el rendimiento es 85 %.</p></section>';
   }
@@ -519,13 +522,14 @@
     return '<div class="campos">'
       + '<label class="campo ancho"><span>Nombre</span><input id="mi-nombre" type="text" value="' + esc(ins.nombre) + '" placeholder="Ej. Pechuga de pollo sin hueso" autocomplete="off"></label>'
       + '<label class="campo"><span>Categoría</span><input id="mi-cat" type="text" list="dl-cats" value="' + esc(ins.categoria) + '" autocomplete="off"><datalist id="dl-cats">' + cats.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></label>'
-      + '<label class="campo"><span>Proveedor</span><input id="mi-prov" type="text" value="' + esc(ins.proveedor) + '" autocomplete="off"></label>'
+      + '<label class="campo"><span>Dónde se cotizó</span><input id="mi-prov" type="text" list="dl-fuentes" value="' + esc(ins.proveedor) + '" placeholder="Walmart, Central de Abastos…" autocomplete="off">' + datalistFuentes() + '</label>'
       + '<label class="campo"><span>Presentación de compra</span><div class="compuesto"><input id="mi-pres" type="text" inputmode="decimal" value="' + esc(ins.presentacion) + '" placeholder="1"><select id="mi-uni">' + opcionesUnidad(u, ins.unidadCompra) + '</select></div><small>Ej. 1 kg, 20 L, paquete de 50 pza</small></label>'
       + '<label class="campo"><span>Precio de esa presentación</span><div class="sufijo"><input id="mi-precio" type="text" inputmode="decimal" value="' + esc(ins.precio) + '" placeholder="0.00"><i>MXN</i></div></label>'
       + '<label class="campo"><span>Rendimiento</span><div class="sufijo"><input id="mi-rend" type="text" inputmode="decimal" value="' + esc(ins.rendimiento) + '" placeholder="100"><i>%</i></div><small>Parte aprovechable después de limpiar</small></label>'
       + '</div><div class="nota" id="mi-calc"></div><div id="mi-aviso"></div>';
   }
   function abrirInsumo(id, alGuardar) {
+    if (id) return abrir('insumo-' + id);
     const existente = id ? IX.insumos.get(id) : null;
     const ins = existente ? copia(existente) : { nombre: '', categoria: '', proveedor: '', presentacion: 1, unidadCompra: 'kg', precio: '', rendimiento: 100 };
     const usos = existente ? usosInsumo(id) : { recetas: [], servicios: [] };
@@ -553,7 +557,8 @@
           render();
           if (alGuardar) alGuardar(existente);
         } else {
-          const nuevo = Object.assign({ id: 'ins-' + D.uid(), actualizado: D.ahora() }, v);
+          const nuevo = Object.assign({ id: 'ins-' + D.uid(), actualizado: D.ahora(), cotizaciones: [], historial: v.precio > 0 ? [{ fecha: D.ahora(), precio: v.precio, presentacion: v.presentacion, unidadCompra: v.unidadCompra, fuente: v.proveedor }] : [] }, v);
+          if (v.precio > 0 && v.proveedor) nuevo.cotizaciones.push({ id: D.uid(), fuente: v.proveedor, precio: v.precio, presentacion: v.presentacion, unidad: v.unidadCompra, fecha: D.ahora() });
           db.insumos.push(nuevo);
           cambioEstructura();
           aviso('Insumo agregado');
@@ -588,6 +593,295 @@
     }
     db.insumos = db.insumos.filter(i => i.id !== id);
     cambioEstructura(); render(); aviso('Insumo eliminado');
+  }
+
+  /* ================================================================ PRECIOS REFERENCIADOS
+     Cada insumo guarda varias cotizaciones (tienda, precio, presentación,
+     fecha, enlace) y un historial de su precio de costeo. Nada externo cambia
+     el costo sin que alguien lo confirme. */
+  const FUENTES = ['Walmart', 'Bodega Aurrerá', 'Soriana', 'HEB', 'Chedraui', 'La Comer', 'Costco', "Sam's Club", 'City Club', 'Central de Abastos', 'Mercado local', 'Proveedor'];
+  const unBase = dim => dim === 'masa' ? 'kg' : dim === 'volumen' ? 'L' : 'pza';
+  const factorBase = dim => dim === 'pieza' ? 1 : 1000;
+  function costoPorUnidad(precio, presentacion, unidad) { const b = C.aBase(presentacion, unidad); return b > 0 ? C.num(precio) / b * factorBase(C.dimension(unidad)) : 0; }
+  const diasDesde = iso => iso ? Math.max(0, Math.floor((Date.now() - new Date(iso)) / 864e5)) : null;
+  const vigencia = () => C.num(db.parametros.diasVigencia) || 30;
+  const vencido = i => !(C.num(i.precio) > 0) || (diasDesde(i.actualizado) ?? 999) > vigencia();
+  function textoEdad(iso) { const d = diasDesde(iso); return d == null ? '—' : d === 0 ? 'Hoy' : d === 1 ? 'Ayer' : 'Hace ' + d + ' días'; }
+  function pillEdad(i) {
+    if (!(C.num(i.precio) > 0)) return '<span class="pill alerta">Sin precio</span>';
+    return '<span class="pill ' + ((diasDesde(i.actualizado) ?? 999) > vigencia() ? 'alerta' : '') + '">' + textoEdad(i.actualizado) + '</span>';
+  }
+  const datalistFuentes = () => '<datalist id="dl-fuentes">' + Array.from(new Set(FUENTES.concat(db.insumos.map(i => i.proveedor).filter(Boolean)))).map(f => '<option value="' + esc(f) + '">').join('') + '</datalist>';
+
+  /** Cambia el precio de costeo y lo anota en el historial (agrupa capturas seguidas). */
+  function registrarPrecio(ins, v, fuente) {
+    ins.historial = Array.isArray(ins.historial) ? ins.historial : [];
+    const nuevo = { precio: C.num(v.precio), presentacion: C.num(v.presentacion) || C.num(ins.presentacion) || 1, unidadCompra: v.unidadCompra || ins.unidadCompra };
+    const igual = C.num(ins.precio) === nuevo.precio && C.num(ins.presentacion) === nuevo.presentacion && ins.unidadCompra === nuevo.unidadCompra;
+    if (!ins.historial.length && C.num(ins.precio) > 0 && !igual) ins.historial.push({ fecha: ins.actualizado || D.ahora(), precio: C.num(ins.precio), presentacion: C.num(ins.presentacion), unidadCompra: ins.unidadCompra, fuente: ins.proveedor || '' });
+    Object.assign(ins, nuevo, { actualizado: D.ahora() });
+    if (fuente != null && fuente !== '') ins.proveedor = fuente;
+    const entrada = { fecha: ins.actualizado, precio: ins.precio, presentacion: ins.presentacion, unidadCompra: ins.unidadCompra, fuente: ins.proveedor || '' };
+    const ult = ins.historial[ins.historial.length - 1];
+    if (ult && (Date.now() - new Date(ult.fecha)) < 3 * 60000 && ult.fuente === entrada.fuente) Object.assign(ult, entrada);   // misma captura
+    else if (!igual || !ult) ins.historial.push(entrada);
+    else ult.confirmado = ins.actualizado;
+    if (ins.historial.length > 80) ins.historial = ins.historial.slice(-80);
+  }
+  /** Agrega o actualiza la cotización de una tienda. */
+  function guardarCotizacion(ins, q) {
+    ins.cotizaciones = Array.isArray(ins.cotizaciones) ? ins.cotizaciones : [];
+    const ex = ins.cotizaciones.find(c => norm(c.fuente) === norm(q.fuente) && C.num(c.presentacion) === C.num(q.presentacion) && c.unidad === q.unidad);
+    const datos = { fuente: q.fuente, precio: C.num(q.precio), presentacion: C.num(q.presentacion), unidad: q.unidad, fecha: q.fecha || D.ahora() };
+    if (q.enlace) datos.enlace = q.enlace;
+    if (q.nota) datos.nota = q.nota;
+    if (ex) Object.assign(ex, datos); else ins.cotizaciones.push(Object.assign({ id: D.uid() }, datos));
+  }
+  function grafica(hist) {
+    const pts = hist.map(h => ({ t: new Date(h.fecha).getTime(), v: costoPorUnidad(h.precio, h.presentacion, h.unidadCompra) })).filter(p => p.v > 0);
+    if (pts.length < 2) return '<p class="tenue">La gráfica aparece cuando el precio cambie al menos una vez.</p>';
+    const W = 320, H = 96, P = 8;
+    const t0 = pts[0].t, t1 = pts[pts.length - 1].t || t0 + 1;
+    const vs = pts.map(p => p.v), mn = Math.min(...vs), mx = Math.max(...vs), rango = mx - mn || mx * .1 || 1;
+    const x = t => P + (t1 === t0 ? (W - 2 * P) / 2 : (t - t0) / (t1 - t0) * (W - 2 * P));
+    const y = v => H - P - (v - (mn - rango * .15)) / (rango * 1.3) * (H - 2 * P);
+    const linea = pts.map(p => x(p.t).toFixed(1) + ',' + y(p.v).toFixed(1)).join(' ');
+    const ult = pts[pts.length - 1];
+    return '<svg class="grafica" viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Evolución del costo"><polygon points="' + x(t0).toFixed(1) + ',' + (H - P) + ' ' + linea + ' ' + x(ult.t).toFixed(1) + ',' + (H - P) + '" class="g-area"/><polyline points="' + linea + '" class="g-linea"/><circle cx="' + x(ult.t).toFixed(1) + '" cy="' + y(ult.v).toFixed(1) + '" r="4" class="g-punto"/></svg>'
+      + '<div class="medidor-txt"><span>Mín. ' + dinero(mn) + '</span><span>Máx. ' + dinero(mx) + '</span></div>';
+  }
+
+  /* ---------------------------------------------------------------- Insumo (pantalla) */
+  function vInsumo(id) {
+    const ins = IX.insumos.get(id);
+    if (!ins) return noEncontrado('El insumo');
+    ctx.obj = ins;
+    ins.cotizaciones = ins.cotizaciones || []; ins.historial = ins.historial || [];
+    const dim = C.dimension(ins.unidadCompra), un = unBase(dim);
+    const cats = Array.from(new Set(D.CATEGORIAS_INSUMO.concat(db.insumos.map(i => i.categoria).filter(Boolean))));
+    const usos = usosInsumo(ins.id);
+    const usado = usos.recetas.length + usos.servicios.length;
+    const cots = ins.cotizaciones.map(c => Object.assign({ porU: costoPorUnidad(c.precio, c.presentacion, c.unidad), compatible: C.dimension(c.unidad) === dim }, c));
+    const validas = cots.filter(c => c.compatible && c.porU > 0);
+    const minimo = validas.length ? Math.min(...validas.map(c => c.porU)) : 0;
+    const filasCot = cots.sort((a, b) => (a.compatible ? a.porU : 1e12) - (b.compatible ? b.porU : 1e12)).map(c => {
+      const actual = norm(c.fuente) === norm(ins.proveedor) && C.num(c.precio) === C.num(ins.precio) && C.num(c.presentacion) === C.num(ins.presentacion) && c.unidad === ins.unidadCompra;
+      return '<tr><td><b>' + esc(c.fuente) + '</b>' + (c.porU === minimo && validas.length > 1 ? ' <span class="pill ok">Más barato</span>' : '') + (actual ? ' <span class="pill acento">En costeo</span>' : '') + '<br><span class="tenue">' + textoEdad(c.fecha) + (c.nota ? ' · ' + esc(c.nota) : '') + '</span></td>'
+        + '<td class="num">' + dinero(c.precio) + '<br><span class="tenue">' + C.fmtCant(c.presentacion) + ' ' + esc(C.nombreUnidad(c.unidad)) + '</span></td>'
+        + '<td class="num"><b>' + (c.compatible ? dinero(c.porU) + ' / ' + un : '<span class="pill error">Otra unidad</span>') + '</b></td>'
+        + '<td class="acc">' + (c.enlace ? '<a class="icono-btn ir" href="' + esc(c.enlace) + '" target="_blank" rel="noopener" aria-label="Abrir en la tienda" title="Abrir en la tienda">' + ico('externo') + '</a>' : '')
+        + (actual || !c.compatible ? '' : '<button class="btn chico" data-accion="usarCot" data-cid="' + c.id + '">Usar</button>')
+        + '<button class="icono-btn" data-accion="quitarCot" data-cid="' + c.id + '" aria-label="Quitar cotización">✕</button></td></tr>';
+    }).join('');
+    const hist = ins.historial.slice().reverse().slice(0, 12).map((h, k, arr) => {
+      const v = costoPorUnidad(h.precio, h.presentacion, h.unidadCompra), prev = arr[k + 1] ? costoPorUnidad(arr[k + 1].precio, arr[k + 1].presentacion, arr[k + 1].unidadCompra) : 0;
+      const varp = prev > 0 ? (v - prev) / prev * 100 : null;
+      return '<div class="fila"><span>' + fechaCorta(h.fecha) + '<br><span class="tenue">' + esc(h.fuente || '—') + '</span></span><span>' + dinero(v) + ' / ' + esc(unBase(C.dimension(h.unidadCompra))) + (varp != null && Math.abs(varp) >= .05 ? '<br><span class="tenue" style="color:var(--' + (varp > 0 ? 'error' : 'ok') + ')">' + (varp > 0 ? '+' : '') + varp.toFixed(1) + ' %</span>' : '') + '</span></div>';
+    }).join('');
+
+    ctx.alCambiar = (obj, campo, v) => {
+      if (campo === 'precio' || campo === 'presentacion' || campo === 'unidadCompra') {
+        registrarPrecio(ins, { precio: campo === 'precio' ? v : ins.precio, presentacion: campo === 'presentacion' ? v : ins.presentacion, unidadCompra: campo === 'unidadCompra' ? v : ins.unidadCompra }, ins.proveedor);
+        return true;
+      }
+      return false;
+    };
+    ctx.alPintar = () => {
+      const c = capaActual(), calc = () => {
+        const pr = C.num(c.querySelector('#q-precio').value), pz = C.num(c.querySelector('#q-pres').value), u = c.querySelector('#q-uni').value;
+        c.querySelector('#q-calc').textContent = pr > 0 && pz > 0 ? '= ' + dinero(costoPorUnidad(pr, pz, u)) + ' por ' + unBase(C.dimension(u)) + ' (' + dinero(pr) + ' por ' + C.fmtCant(pz) + ' ' + C.nombreUnidad(u) + ')' : '';
+      };
+      ['#q-precio', '#q-pres', '#q-uni'].forEach(sel => { const el = c.querySelector(sel); if (el) { el.addEventListener('input', calc); el.addEventListener('change', calc); } });
+      calc();
+    };
+    ctx.recalcular = () => {
+      $('costoCompra').textContent = dinero(C.costoBaseCompra(ins) * factorBase(C.dimension(ins.unidadCompra)));
+      $('costoNeto').textContent = dinero(C.costoBaseNeto(ins) * factorBase(C.dimension(ins.unidadCompra)));
+      $('edadPrecio').innerHTML = pillEdad(ins);
+      actualizarTitulo(ins.nombre || 'Insumo');
+    };
+    ctx.acciones = {
+      agregarCot: () => {
+        const c = capaActual();
+        const q = { fuente: c.querySelector('#q-fuente').value.trim(), precio: C.num(c.querySelector('#q-precio').value), presentacion: C.num(c.querySelector('#q-pres').value), unidad: c.querySelector('#q-uni').value, enlace: c.querySelector('#q-enlace').value.trim() };
+        if (!q.fuente) return aviso('Escribe la tienda o el proveedor', true);
+        if (!(q.precio > 0)) return aviso('Escribe el precio', true);
+        if (!(q.presentacion > 0)) return aviso('Escribe la presentación', true);
+        if (C.dimension(q.unidad) !== C.dimension(ins.unidadCompra) && usado) return aviso('Este insumo se usa en recetas medido en ' + C.DIM_NOMBRE[C.dimension(ins.unidadCompra)] + '; usa una unidad de ' + C.DIM_NOMBRE[C.dimension(ins.unidadCompra)], true);
+        guardarCotizacion(ins, q);
+        if (c.querySelector('#q-usar').checked) registrarPrecio(ins, { precio: q.precio, presentacion: q.presentacion, unidadCompra: q.unidad }, q.fuente);
+        if (q.enlace && !ins.enlace) ins.enlace = q.enlace;
+        cambioEstructura(); render(); aviso('Cotización guardada');
+      },
+      usarCot: d => { const q = ins.cotizaciones.find(c => c.id === d.cid); if (!q) return; registrarPrecio(ins, { precio: q.precio, presentacion: q.presentacion, unidadCompra: q.unidad }, q.fuente); if (q.enlace) ins.enlace = q.enlace; cambioEstructura(); render(); aviso('Precio de costeo: ' + q.fuente); },
+      quitarCot: d => { ins.cotizaciones = ins.cotizaciones.filter(c => c.id !== d.cid); guardar(true); render(); },
+      confirmarPrecio: () => { registrarPrecio(ins, ins, ins.proveedor); guardar(true); render(); aviso('Precio confirmado hoy'); },
+      eliminar: () => {
+        if (usado) return abrirModal({ titulo: 'No se puede eliminar', compacto: true, cuerpo: '<p>Este insumo se usa en:</p><ul>' + usos.recetas.map(r => '<li>Receta: ' + esc(r.nombre) + '</li>').join('') + usos.servicios.map(s => '<li>Servicio: ' + esc(s.nombre) + '</li>').join('') + '</ul>', botones: [{ texto: 'Entendido', clase: 'primario' }] });
+        confirmar('Eliminar insumo', '¿Eliminar <b>' + esc(ins.nombre) + '</b>?', 'Eliminar', () => { db.insumos = db.insumos.filter(x => x.id !== ins.id); cambioEstructura(); atras(); aviso('Insumo eliminado'); });
+      }
+    };
+    return '<div class="cabecera"><div><span class="ceja">Insumo · ' + esc(ins.categoria || 'Sin categoría') + '</span><h1>' + esc(ins.nombre || 'Insumo') + '</h1></div>'
+      + '<div class="acciones">' + (ins.enlace ? '<a class="btn" href="' + esc(ins.enlace) + '" target="_blank" rel="noopener">' + ico('externo') + 'Ver en tienda</a>' : '') + '<button class="btn" data-accion="confirmarPrecio">' + ico('check') + 'Confirmar precio</button><button class="btn peligro" data-accion="eliminar">' + ico('borrar') + 'Eliminar</button></div></div>'
+      + '<div class="rejilla r-lateral"><div class="rejilla">'
+      + '<section class="panel"><div class="panel-cab"><h2>Precio de costeo</h2><span id="edadPrecio">' + pillEdad(ins) + '</span></div>'
+      + '<div class="caja-doble"><div><span class="et">Costo de compra / ' + un + '</span><b id="costoCompra">' + dinero(C.costoBaseCompra(ins) * factorBase(dim)) + '</b></div><div class="acento"><span class="et">Costo aprovechable / ' + un + '</span><b id="costoNeto">' + dinero(C.costoBaseNeto(ins) * factorBase(dim)) + '</b></div></div>'
+      + '<div class="campos">'
+      + campoTexto('Precio', 'precio', ins.precio, { num: true, suf: 'MXN' })
+      + '<label class="campo"><span>Presentación</span><div class="compuesto"><input type="text" inputmode="decimal" id="f-presentacion" data-campo="presentacion" data-tipo="num" value="' + esc(ins.presentacion) + '"><select data-campo="unidadCompra" data-rerender aria-label="Unidad de compra">' + opcionesUnidad(usado ? C.unidadesDe(dim) : Object.keys(C.UNIDADES), ins.unidadCompra) + '</select></div></label>'
+      + campoTexto('Rendimiento', 'rendimiento', ins.rendimiento, { num: true, suf: '%', ayuda: 'Parte aprovechable después de limpiar' })
+      + campoTexto('Dónde se cotizó', 'proveedor', ins.proveedor, { lista: 'dl-fuentes', ph: 'Walmart, Central de Abastos…' })
+      + campoTexto('Enlace al producto', 'enlace', ins.enlace, { ancho: true, ph: 'https://super.walmart.com.mx/…', ayuda: 'Para abrir la tienda y revisar el precio con un toque' })
+      + '</div>' + datalistFuentes() + '</section>'
+      + '<section class="panel"><div class="panel-cab"><div><h2>Cotizaciones</h2><p>Compara tiendas. "Usar" pasa ese precio al costeo.</p></div></div>'
+      + (filasCot ? '<div class="tabla-env"><table><thead><tr><th>Dónde</th><th class="num">Precio</th><th class="num">Por ' + un + '</th><th></th></tr></thead><tbody>' + filasCot + '</tbody></table></div>' : '<p class="tenue">Aún no hay cotizaciones. Agrega el precio de dos o tres tiendas para comparar.</p>')
+      + '<div class="campos agregar-cot"><label class="campo"><span>Tienda o proveedor</span><input type="text" id="q-fuente" list="dl-fuentes" autocomplete="off" placeholder="Walmart"></label>'
+      + '<label class="campo"><span>Precio</span><div class="sufijo"><input type="text" id="q-precio" inputmode="decimal" placeholder="0.00"><i>MXN</i></div></label>'
+      + '<label class="campo"><span>Presentación</span><div class="compuesto"><input type="text" id="q-pres" inputmode="decimal" value="' + esc(ins.presentacion || 1) + '"><select id="q-uni" aria-label="Unidad">' + opcionesUnidad(usado ? C.unidadesDe(dim) : Object.keys(C.UNIDADES), ins.unidadCompra) + '</select></div></label>'
+      + '<label class="campo ancho"><span>Enlace (opcional)</span><input type="text" id="q-enlace" placeholder="https://…" autocomplete="off"></label>'
+      + '<p class="tenue ancho" id="q-calc" aria-live="polite"></p>'
+      + '<label class="check"><input type="checkbox" id="q-usar"' + (C.num(ins.precio) > 0 ? '' : ' checked') + '> Usar como precio de costeo</label>'
+      + '<div class="acciones"><button class="btn primario" data-accion="agregarCot">' + ico('mas') + 'Guardar cotización</button></div></div></section>'
+      + '<section class="panel"><h2>Datos</h2><div class="campos">' + campoTexto('Nombre', 'nombre', ins.nombre, { ancho: true })
+      + '<label class="campo"><span>Categoría</span><input type="text" id="f-categoria" data-campo="categoria" list="dl-cats" value="' + esc(ins.categoria) + '" autocomplete="off"><datalist id="dl-cats">' + cats.map(c => '<option value="' + esc(c) + '">').join('') + '</datalist></label></div></section>'
+      + '</div><aside class="pegajoso rejilla"><section class="panel"><h2>Historial del costo</h2>' + grafica(ins.historial) + (hist ? '<div class="resumen">' + hist + '</div>' : '<p class="tenue">Cada cambio de precio queda registrado aquí con su fecha y su fuente.</p>') + '</section>'
+      + '<section class="panel"><h2>Se usa en</h2>' + (usado ? '<div class="chips-sel">' + usos.recetas.map(r => '<a class="pill" href="#receta-' + r.id + '">' + esc(r.nombre) + '</a>').join('') + usos.servicios.map(s => '<a class="pill info" href="#servicio-' + s.id + '">' + esc(s.nombre) + '</a>').join('') + '</div>' : '<p class="tenue">Todavía no está en ninguna receta ni servicio.</p>') + '</section></aside></div>';
+  }
+
+  /* ---------------------------------------------------------------- Actualizar precios */
+  const estadoPrecios = { modo: '', q: '' };
+  function vPrecios() {
+    const e = estadoPrecios;
+    const nVenc = db.insumos.filter(vencido).length, nSin = db.insumos.filter(i => !(C.num(i.precio) > 0)).length;
+    if (!e.modo) e.modo = nVenc ? 'vencidos' : 'todos';
+    const q = norm(e.q);
+    const lista = db.insumos.filter(i => (e.modo === 'todos' || (e.modo === 'vencidos' ? vencido(i) : !(C.num(i.precio) > 0))) && (!q || norm(i.nombre + ' ' + (i.proveedor || '')).includes(q)))
+      .sort((a, b) => (C.num(a.precio) > 0) - (C.num(b.precio) > 0) || String(a.actualizado || '').localeCompare(String(b.actualizado || '')) || sortNombre(a, b));
+    const fila = i => '<div class="precio-fila" data-id="' + i.id + '"><div class="pf-info"><b>' + esc(i.nombre) + '</b><span class="tenue pf-actual">' + resumenPrecio(i) + '</span></div>'
+      + '<div class="pf-edad">' + pillEdad(i) + '</div>'
+      + '<div class="pf-captura"><input type="text" class="pf-fuente" list="dl-fuentes" value="' + esc(i.proveedor || '') + '" placeholder="Tienda" aria-label="Tienda de ' + esc(i.nombre) + '" autocomplete="off">'
+      + '<div class="sufijo"><input type="text" class="pf-precio" inputmode="decimal" placeholder="' + (C.num(i.precio) > 0 ? C.num(i.precio).toFixed(2) : 'Precio') + '" aria-label="Precio de ' + esc(i.nombre) + '" autocomplete="off"><i>/' + C.fmtCant(i.presentacion) + ' ' + esc(C.nombreUnidad(i.unidadCompra)) + '</i></div>'
+      + (i.enlace ? '<a class="icono-btn ir" href="' + esc(i.enlace) + '" target="_blank" rel="noopener" aria-label="Abrir en la tienda" title="Abrir en la tienda">' + ico('externo') + '</a>' : '<span class="pf-hueco"></span>')
+      + '<button type="button" class="btn chico primario" data-accion="guardarPrecio" data-id="' + i.id + '" aria-label="Guardar precio de ' + esc(i.nombre) + '" title="Guardar (Enter). Vacío = confirmar el actual">' + ico('check') + '</button></div></div>';
+    const guardarFila = el => {
+      const id = el.dataset.id, ins = IX.insumos.get(id); if (!ins) return;
+      const precio = C.num(el.querySelector('.pf-precio').value), fuente = el.querySelector('.pf-fuente').value.trim();
+      if (!(precio > 0) && !(C.num(ins.precio) > 0)) { aviso('Escribe el precio de ' + ins.nombre, true); el.querySelector('.pf-precio').focus(); return; }
+      const v = { precio: precio > 0 ? precio : ins.precio, presentacion: ins.presentacion, unidadCompra: ins.unidadCompra };
+      registrarPrecio(ins, v, fuente || ins.proveedor);
+      if (fuente) guardarCotizacion(ins, { fuente, precio: v.precio, presentacion: v.presentacion, unidad: v.unidadCompra });
+      guardar(true);
+      el.querySelector('.pf-actual').innerHTML = resumenPrecio(ins);
+      el.querySelector('.pf-edad').innerHTML = pillEdad(ins);
+      el.querySelector('.pf-precio').value = ''; el.querySelector('.pf-precio').placeholder = C.num(ins.precio).toFixed(2);
+      el.classList.add('hecho');
+      const sig = el.nextElementSibling && el.nextElementSibling.querySelector('.pf-precio');
+      if (sig) sig.focus(); else el.querySelector('.pf-precio').blur();
+      const pend = db.insumos.filter(vencido).length;
+      const m = capaActual().querySelector('#nVencidos'); if (m) m.textContent = pend;
+    };
+    ctx.acciones = {
+      guardarPrecio: (d, b) => guardarFila(b.closest('.precio-fila')),
+      modoPrecios: d => { e.modo = d.modo; render(); },
+      importarFactura: () => importarFactura()
+    };
+    ctx.alPintar = () => {
+      const c = capaActual();
+      c.querySelectorAll('.pf-precio, .pf-fuente').forEach(inp => inp.addEventListener('keydown', ev => { if (ev.key === 'Enter') { ev.preventDefault(); guardarFila(inp.closest('.precio-fila')); } }));
+      const b = $('fqp'); b.addEventListener('input', () => { e.q = b.value; const p = b.selectionStart; render(); const nb = $('fqp'); nb.focus(); try { nb.setSelectionRange(p, p); } catch (er) { /* */ } });
+    };
+    return '<div class="cabecera"><div><span class="ceja">Insumos</span><h1>Actualizar precios</h1></div><div class="acciones"><button class="btn" data-accion="importarFactura">' + ico('facturacion') + 'Importar factura</button></div></div>'
+      + '<div class="metricas"><div class="metrica destacada"><span class="et">Por actualizar</span><span class="val" id="nVencidos">' + nVenc + '</span><span class="det">más de ' + vigencia() + ' días o sin precio</span></div><div class="metrica"><span class="et">Sin precio</span><span class="val">' + nSin + '</span><span class="det">no se pueden costear</span></div><div class="metrica"><span class="et">Insumos</span><span class="val">' + db.insumos.length + '</span><span class="det">en el catálogo</span></div><div class="metrica"><span class="et">Vigencia</span><span class="val">' + vigencia() + ' días</span><span class="det">se cambia en Ajustes</span></div></div>'
+      + '<div class="nota">Abre la tienda en otra pestaña, escribe el precio y presiona <b>Enter</b>: se guarda y pasa al siguiente. Con el precio vacío, Enter confirma que el actual sigue vigente.</div>'
+      + '<div class="pestanas">' + [['vencidos', 'Por actualizar'], ['sin', 'Sin precio'], ['todos', 'Todos']].map(m => '<button class="' + (e.modo === m[0] ? 'activa' : '') + '" data-accion="modoPrecios" data-modo="' + m[0] + '">' + m[1] + '</button>').join('') + '</div>'
+      + '<div class="filtros"><input type="search" id="fqp" placeholder="Buscar insumo o tienda" value="' + esc(e.q) + '" aria-label="Buscar insumo"></div>'
+      + (lista.length ? '<section class="panel lista-precios">' + lista.map(fila).join('') + '</section>' : '<div class="vacio"><h3>' + (e.modo === 'vencidos' ? 'Todo al día' : 'Nada que mostrar') + '</h3><p>' + (e.modo === 'vencidos' ? 'Todos los precios se revisaron en los últimos ' + vigencia() + ' días.' : 'Ningún insumo coincide.') + '</p></div>')
+      + datalistFuentes();
+  }
+  function resumenPrecio(i) { return C.num(i.precio) > 0 ? dinero(i.precio) + ' · ' + C.fmtCant(i.presentacion) + ' ' + esc(C.nombreUnidad(i.unidadCompra)) + (i.proveedor ? ' · ' + esc(i.proveedor) : '') : 'Sin precio'; }
+
+  /* ---------------------------------------------------------------- Facturas (CFDI) */
+  const UNIDAD_SAT = { KGM: [1, 'kg'], GRM: [1, 'g'], LTR: [1, 'l'], MLT: [1, 'ml'], H87: [1, 'pza'], EA: [1, 'pza'], XUN: [1, 'pza'], C62: [1, 'pza'], XPK: [1, 'pza'], XBX: [1, 'pza'], LBR: [1, 'lb'], ONZ: [1, 'oz'], DZN: [1, 'docena'] };
+  function leerCFDI(txt) {
+    const doc = new DOMParser().parseFromString(txt, 'application/xml');
+    if (doc.getElementsByTagName('parsererror').length) throw new Error('El archivo no es un XML válido');
+    const uno = n => doc.getElementsByTagNameNS('*', n)[0];
+    const comp = uno('Comprobante');
+    if (!comp) throw new Error('El archivo no parece una factura electrónica (CFDI)');
+    const em = uno('Emisor');
+    const conceptos = Array.from(doc.getElementsByTagNameNS('*', 'Concepto')).map(c => {
+      const a = n => c.getAttribute(n) || '';
+      const imp = Array.from(c.getElementsByTagNameNS('*', 'Traslado')).reduce((s, t) => s + C.num(t.getAttribute('Importe')), 0);
+      return { clave: a('NoIdentificacion'), desc: a('Descripcion'), cantidad: C.num(a('Cantidad')) || 1, claveUnidad: a('ClaveUnidad'), unidadTxt: a('Unidad') || a('ClaveUnidad'), valorUnitario: C.num(a('ValorUnitario')), importe: C.num(a('Importe')), descuento: C.num(a('Descuento')), impuestos: imp };
+    });
+    return { emisor: { nombre: em ? em.getAttribute('Nombre') || '' : '', rfc: em ? em.getAttribute('Rfc') || '' : '' }, fecha: (comp.getAttribute('Fecha') || '').slice(0, 10), folio: (comp.getAttribute('Serie') || '') + (comp.getAttribute('Folio') || ''), conceptos };
+  }
+  function sugerirInsumo(desc) {
+    const tok = s => norm(s).split(/[^a-z0-9ñ]+/).filter(w => w.length > 3);
+    const td = new Set(tok(desc));
+    let mejor = null, puntos = 0;
+    db.insumos.forEach(i => { const ti = tok(i.nombre); if (!ti.length) return; const p = ti.filter(w => td.has(w)).length / ti.length; if (p > puntos) { puntos = p; mejor = i; } });
+    return puntos >= .5 ? mejor : null;
+  }
+  function importarFactura() { elegirArchivo('.xml,text/xml,application/xml', txt => { try { abrirFactura(leerCFDI(txt)); } catch (er) { aviso(er.message, true); } }); }
+  function abrirFactura(f) {
+    if (!f.conceptos.length) return aviso('La factura no tiene conceptos', true);
+    const fuente = f.emisor.nombre || f.emisor.rfc || 'Proveedor';
+    const filas = f.conceptos.map((c, k) => {
+      const llave = norm(f.emisor.rfc + '|' + (c.clave || c.desc));
+      let ins = null, pres = null;
+      db.insumos.some(i => (i.aliasFactura || []).some(a => { if (a.llave === llave) { ins = i; pres = a; return true; } return false; }));
+      if (!ins) ins = sugerirInsumo(c.desc);
+      const sat = ['XPK', 'XBX'].includes(c.claveUnidad) && ins ? null : UNIDAD_SAT[c.claveUnidad];   // paquete o caja: usa la presentación del insumo
+      const cant = pres ? pres.presentacion : sat && (!ins || C.dimension(sat[1]) === C.dimension(ins.unidadCompra)) ? sat[0] : ins ? ins.presentacion : 1;
+      const uni = pres ? pres.unidad : sat && (!ins || C.dimension(sat[1]) === C.dimension(ins.unidadCompra)) ? sat[1] : ins ? ins.unidadCompra : 'pza';
+      return { k, c, llave, ins: ins ? ins.id : '', cant, uni, recordado: !!pres };
+    });
+    const opciones = sel => '<option value="">No importar</option><option value="nuevo"' + (sel === 'nuevo' ? ' selected' : '') + '>+ Crear insumo nuevo</option>' + db.insumos.slice().sort(sortNombre).map(i => '<option value="' + i.id + '"' + (i.id === sel ? ' selected' : '') + '>' + esc(i.nombre) + '</option>').join('');
+    const precioDe = (c, conImp) => (c.importe - c.descuento + (conImp ? c.impuestos : 0)) / (c.cantidad || 1);
+    const cuerpo = '<div class="caja-doble"><div><span class="et">Proveedor</span><b style="font-size:1rem">' + esc(fuente) + '</b><span class="tenue">' + esc(f.emisor.rfc) + '</span></div><div><span class="et">Factura</span><b style="font-size:1rem">' + esc(f.folio || '—') + '</b><span class="tenue">' + fechaCorta(f.fecha) + ' · ' + f.conceptos.length + ' conceptos</span></div></div>'
+      + '<label class="check"><input type="checkbox" id="fx-imp" checked> Sumar impuestos de la factura (IVA, IEPS) al costo</label>'
+      + '<div class="tabla-env"><table class="editable"><thead><tr><th>Concepto de la factura</th><th>Insumo</th><th>1 unidad equivale a</th><th class="num">Precio</th><th>Costeo</th></tr></thead><tbody>'
+      + filas.map(r => '<tr data-k="' + r.k + '"><td><b>' + esc(r.c.desc) + '</b><br><span class="tenue">' + C.fmtCant(r.c.cantidad) + ' ' + esc(r.c.unidadTxt) + ' × ' + dinero(r.c.valorUnitario) + (r.recordado ? ' · <span class="pill ok">Recordado</span>' : '') + '</span></td>'
+        + '<td><select class="fx-ins" aria-label="Insumo">' + opciones(r.ins) + '</select></td>'
+        + '<td style="width:190px"><div class="compuesto"><input type="text" class="fx-cant" inputmode="decimal" value="' + esc(r.cant) + '" aria-label="Cantidad"><select class="fx-uni" aria-label="Unidad">' + opcionesUnidad(Object.keys(C.UNIDADES), r.uni) + '</select></div></td>'
+        + '<td class="num fx-precio">' + dinero(precioDe(r.c, true)) + '</td>'
+        + '<td><label class="check"><input type="checkbox" class="fx-usar" checked> Usar</label></td></tr>').join('')
+      + '</tbody></table></div><p class="tenue">La primera vez liga cada concepto con tu insumo. La plataforma lo recuerda para las siguientes facturas de este proveedor. Cada precio queda como cotización y, si marcas "Usar", pasa al costeo.</p>';
+    abrirModal({
+      titulo: 'Importar factura', ancho: true, cuerpo,
+      alAbrir: c => {
+        const pintarPrecios = () => { const ci = c.querySelector('#fx-imp').checked; c.querySelectorAll('tr[data-k]').forEach(tr => { tr.querySelector('.fx-precio').textContent = dinero(precioDe(filas[+tr.dataset.k].c, ci)); }); };
+        c.querySelector('#fx-imp').addEventListener('change', pintarPrecios);
+        c.querySelectorAll('.fx-ins').forEach(s => s.addEventListener('change', () => { const ins = IX.insumos.get(s.value); const tr = s.closest('tr'); if (ins && C.dimension(tr.querySelector('.fx-uni').value) !== C.dimension(ins.unidadCompra)) { tr.querySelector('.fx-uni').value = ins.unidadCompra; tr.querySelector('.fx-cant').value = ins.presentacion; } }));
+      },
+      botones: [{ texto: 'Cancelar', clase: 'fantasma' }, {
+        texto: 'Aplicar precios', clase: 'primario', accion: c => {
+          const conImp = c.querySelector('#fx-imp').checked;
+          let n = 0, nuevos = 0; const errores = [];
+          c.querySelectorAll('tr[data-k]').forEach(tr => {
+            const r = filas[+tr.dataset.k], sel = tr.querySelector('.fx-ins').value;
+            if (!sel) return;
+            const cant = C.num(tr.querySelector('.fx-cant').value), uni = tr.querySelector('.fx-uni').value, precio = precioDe(r.c, conImp);
+            if (!(cant > 0) || !(precio > 0)) { errores.push(r.c.desc); return; }
+            let ins = IX.insumos.get(sel);
+            if (sel === 'nuevo') {
+              const nombre = r.c.desc.charAt(0).toUpperCase() + r.c.desc.slice(1).toLowerCase();
+              ins = { id: 'ins-' + D.uid(), nombre, categoria: 'Otros', presentacion: cant, unidadCompra: uni, precio: 0, rendimiento: 100, proveedor: fuente, actualizado: D.ahora(), cotizaciones: [], historial: [] };
+              db.insumos.push(ins); nuevos++;
+            }
+            if (!ins) return;
+            if (C.dimension(uni) !== C.dimension(ins.unidadCompra) && usosInsumo(ins.id).recetas.length) { errores.push(r.c.desc + ' (otra unidad)'); return; }
+            guardarCotizacion(ins, { fuente, precio, presentacion: cant, unidad: uni, fecha: f.fecha ? f.fecha + 'T12:00:00' : D.ahora(), nota: 'Factura ' + (f.folio || '') });
+            if (tr.querySelector('.fx-usar').checked || sel === 'nuevo') registrarPrecio(ins, { precio, presentacion: cant, unidadCompra: uni }, fuente);
+            ins.aliasFactura = (ins.aliasFactura || []).filter(a => a.llave !== r.llave).concat({ llave: r.llave, presentacion: cant, unidad: uni });
+            n++;
+          });
+          cambioEstructura(); render();
+          aviso(n + ' precio' + (n === 1 ? '' : 's') + ' importado' + (n === 1 ? '' : 's') + (nuevos ? ', ' + nuevos + ' insumo' + (nuevos === 1 ? '' : 's') + ' nuevo' + (nuevos === 1 ? '' : 's') : '') + (errores.length ? '. Revisa: ' + errores.join(', ') : ''), !!errores.length);
+        }
+      }]
+    });
   }
 
   /* ================================================================ RECETAS */
@@ -1082,7 +1376,7 @@
       ico2('recetas', 'recetas', 'Recetas', conError || ''),
       btnIco('abrirEscalador', 'escalar', 'Escalar'),
       ico2('compras', 'compras', 'Compras', porSurtir || ''),
-      ico2('insumos', 'insumos', 'Insumos', sinPrecio ? '!' : ''),
+      ico2('insumos', 'insumos', 'Insumos', db.insumos.filter(vencido).length || ''),
       ico2('tablero', 'tablero', 'Tablero')
     ];
     if (NUBE && esAdmin()) iconos.push(ico2('usuarios', 'usuarios', 'Usuarios'));
@@ -1160,7 +1454,7 @@
     db.eventos.forEach(e => { if (norm([e.nombre, e.cliente, e.folio, e.lugar].join(' ')).includes(q)) res.push(['Evento', esc(e.nombre || e.folio) + ' <span class="tenue">' + esc(e.cliente || '') + ' · ' + fechaCorta(e.fecha) + '</span>', 'data-h="#evento-' + e.id + '"']); });
     db.recetas.forEach(r => { if (norm(r.nombre + ' ' + r.codigo).includes(q)) res.push(['Receta', esc(r.nombre) + ' <span class="tenue">' + esc(r.codigo) + '</span>', 'data-h="#receta-' + r.id + '"']); });
     db.servicios.forEach(s => { if (norm(s.nombre).includes(q)) res.push(['Servicio', esc(s.nombre) + ' <span class="tenue">' + esc(nombreLinea(s.linea)) + '</span>', 'data-h="#servicio-' + s.id + '"']); });
-    db.insumos.forEach(i => { if (norm(i.nombre + ' ' + (i.proveedor || '')).includes(q)) res.push(['Insumo', esc(i.nombre) + ' <span class="tenue">' + costoNetoTexto(i) + '</span>', 'data-tipo="insumo" data-id="' + i.id + '"']); });
+    db.insumos.forEach(i => { if (norm(i.nombre + ' ' + (i.proveedor || '')).includes(q)) res.push(['Insumo', esc(i.nombre) + ' <span class="tenue">' + costoNetoTexto(i) + '</span>', 'data-h="#insumo-' + i.id + '"']); });
     if (!res.length) return '<div class="res-vacio">Sin resultados para esa búsqueda.</div>';
     return res.slice(0, 10).map(r => '<button type="button" class="res" data-accion="irBusca" ' + r[2] + '><span class="pill">' + r[0] + '</span><span>' + r[1] + '</span></button>').join('');
   }
@@ -1287,7 +1581,7 @@
   }
 
   /* ---------------------------------------------------------- Solo lectura */
-  const ACC_LECTURA = new Set(['buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ACC_LECTURA = new Set(['modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
   const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
   function aplicarSoloLectura() {
     capaActual().querySelectorAll('input, select, textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
@@ -1449,7 +1743,7 @@
       + '</div></section>'
       + '<section class="panel"><h2>Valores por omisión</h2><p class="tenue">Se aplican a recetas, servicios y eventos nuevos.</p><div class="campos">'
       + campoTexto('IVA', 'iva', db.parametros.iva, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Margen de utilidad', 'margen', db.parametros.margen, { grupo: 'parametros', num: true, suf: '%' })
-      + campoTexto('Food cost objetivo', 'foodCost', db.parametros.foodCost, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Gastos indirectos', 'indirectos', db.parametros.indirectos, { grupo: 'parametros', num: true, suf: '%', ayuda: 'Renta, luz, administración…' })
+      + campoTexto('Food cost objetivo', 'foodCost', db.parametros.foodCost, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Gastos indirectos', 'indirectos', db.parametros.indirectos, { grupo: 'parametros', num: true, suf: '%', ayuda: 'Renta, luz, administración…' }) + campoTexto('Vigencia de precios', 'diasVigencia', db.parametros.diasVigencia, { grupo: 'parametros', num: true, suf: 'días', ayuda: 'Después de estos días un precio se marca para revisar' })
       + '</div><label class="campo"><span>Apariencia</span><select id="tema"><option value=""' + (!tema ? ' selected' : '') + '>Igual que el sistema</option><option value="light"' + (tema === 'light' ? ' selected' : '') + '>Clara</option><option value="dark"' + (tema === 'dark' ? ' selected' : '') + '>Oscura</option></select></label></section></div>'
       + '<section class="panel"><h2>Tu información</h2><p class="tenue">' + (NUBE ? 'Se guarda en la nube y todas las cuentas ven lo mismo. Descarga un respaldo de vez en cuando como seguridad.' : 'Todo se guarda en este navegador. Descarga un respaldo con frecuencia y úsalo para pasar la información a otra computadora.') + '</p>'
       + '<div class="acciones"><button class="btn primario" data-accion="respaldo">' + ico('bajar') + 'Descargar respaldo</button><button class="btn" data-accion="restaurar">' + ico('subir') + 'Restaurar respaldo</button>'

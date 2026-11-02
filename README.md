@@ -37,6 +37,20 @@ marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 | **Usuarios** | Solo con Firebase: cuentas, roles (Dueño, Administrador, Editor, Consulta) y solicitudes de acceso. |
 | **Ajustes** | Datos de la empresa para los documentos, IVA / margen / food cost / indirectos por omisión, modo claro u oscuro, respaldo y restauración JSON. |
 
+## Precios referenciados
+
+- Cada insumo tiene su **pantalla propia**: precio de costeo, cotizaciones de
+  varias tiendas (Walmart, Soriana, Costco, Central de Abastos…) comparadas
+  por kg / L / pieza, enlace al producto e **historial** con gráfica.
+- **Usar** pasa una cotización al costeo. Ningún precio externo cambia el
+  costo sin que alguien lo confirme.
+- **Actualizar precios** (desde Insumos) lista primero lo que no se ha revisado
+  en los días de vigencia (30 por omisión, en Ajustes): escribes el precio,
+  Enter guarda y pasa al siguiente; Enter vacío confirma el precio actual.
+- **Importar factura**: lee el XML (CFDI 3.3 / 4.0) de cualquier proveedor,
+  sugiere el insumo de cada concepto, calcula el precio con descuentos e
+  impuestos y recuerda la relación para la siguiente factura.
+
 ## Cómo se calcula
 
 - Las cantidades de las recetas son **netas** (lo que entra a la olla).

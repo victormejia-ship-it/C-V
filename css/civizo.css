@@ -280,7 +280,7 @@ a.pill { text-decoration: none; }
 .vacio { border-radius: var(--radio); padding: 40px 20px; text-align: center; display: flex; flex-direction: column; gap: 12px; align-items: center; color: var(--tinta-suave); background: var(--superficie-2); }
 .panel .vacio { background: var(--superficie-2); }
 .vacio h3 { color: var(--tinta); }
-.nota { background: var(--info-fondo); color: var(--tinta); border-radius: var(--radio-m); padding: 12px 16px; font-size: .85rem; display: flex; gap: 10px; align-items: flex-start; }
+.nota { background: var(--info-fondo); color: var(--tinta); border-radius: var(--radio-m); padding: 12px 16px; font-size: .85rem; display: block; }
 .nota.alerta { background: var(--alerta-fondo); }
 .nota.acento { background: var(--acento-fondo); }
 .nota b { font-weight: 600; }
@@ -441,3 +441,31 @@ details summary { cursor: pointer; }
 }
 .capa:focus { outline: none; }
 .modal-cuerpo > *, .contenido > * { flex-shrink: 0; }
+
+/* ================================================== Precios referenciados */
+.check { display: inline-flex; align-items: center; gap: 8px; font-size: .86rem; cursor: pointer; }
+.check input { width: 18px; height: 18px; accent-color: var(--naranja); }
+.agregar-cot { padding-top: 16px; border-top: 1px solid var(--linea); align-items: end; }
+.agregar-cot .check, .agregar-cot .acciones { grid-column: 1 / -1; }
+.icono-btn.ir:hover { background: var(--superficie-2); color: var(--tinta); }
+.icono-btn svg { width: 17px; height: 17px; stroke: currentColor; fill: none; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+.grafica { width: 100%; height: auto; display: block; }
+.grafica .g-area { fill: var(--acento-fondo); stroke: none; }
+.grafica .g-linea { fill: none; stroke: var(--acento); stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.grafica .g-punto { fill: var(--acento); stroke: var(--superficie); stroke-width: 2; }
+.lista-precios { gap: 0; padding-block: 6px; }
+.precio-fila { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 470px); gap: 10px 16px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--linea); }
+.precio-fila:last-child { border-bottom: 0; }
+.precio-fila.hecho .pf-info b::after { content: "  ✓"; color: var(--ok); }
+.pf-info { display: flex; flex-direction: column; min-width: 0; }
+.pf-info b { font-weight: 500; }
+.pf-captura { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr) 34px auto; gap: 8px; align-items: center; }
+.pf-captura .sufijo input { padding-right: 62px; }
+.pf-captura .sufijo i { max-width: 54px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.pf-captura .btn { width: 42px; height: 42px; padding: 0; border-radius: 50%; }
+@media (max-width: 860px) {
+  .precio-fila { grid-template-columns: minmax(0, 1fr) auto; }
+  .pf-captura { grid-column: 1 / -1; }
+}
+
+.agregar-cot #q-calc { grid-column: 1 / -1; min-height: 1.2em; }
