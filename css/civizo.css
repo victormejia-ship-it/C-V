@@ -526,3 +526,7 @@ details summary { cursor: pointer; }
 .comparativo td:first-child a { color: inherit; text-decoration: none; }
 .comparativo td:first-child a:hover b { color: var(--acento-tinta); }
 .modal .panel.pedido { background: var(--superficie); }
+
+/* ================================================== Inventario */
+.pf-captura.conteo { grid-template-columns: minmax(0, 1fr) 96px auto; }
+.chips-sel label:has(input[type=radio]:checked) { background: var(--acento-fondo); color: var(--acento-tinta); font-weight: 500; }

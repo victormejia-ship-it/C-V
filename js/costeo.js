@@ -287,7 +287,7 @@
         id, nombre: ins.nombre, categoria: ins.categoria || 'Sin categoría', proveedor: ins.proveedor || '',
         dim, netaBase, brutaBase,
         empaques, empaquesCompra,
-        presentacion: num(ins.presentacion), unidadCompra: ins.unidadCompra,
+        presentacion: num(ins.presentacion), unidadCompra: ins.unidadCompra, precio: num(ins.precio),
         costoUso: brutaBase * costoBaseCompra(ins),
         costoCompra: empaquesCompra * num(ins.precio)
       });
@@ -403,6 +403,38 @@
   }
 
 
+
+  /* ------------------------------------------------------------ Inventario */
+
+  /** Existencia por insumo (unidad base) sumando movimientos con signo. */
+  function existencias(movs) {
+    const m = new Map();
+    (movs || []).forEach(x => { if (x && x.insumoId) m.set(x.insumoId, (m.get(x.insumoId) || 0) + num(x.cantidad)); });
+    return m;
+  }
+  /** Signo de un movimiento según su tipo (el ajuste ya trae su diferencia). */
+  function cantidadConSigno(tipo, cantidadBase) {
+    const c = Math.abs(num(cantidadBase));
+    return tipo === 'entrada' ? c : tipo === 'salida' || tipo === 'merma' ? -c : num(cantidadBase);
+  }
+  /**
+   * Resta la existencia a una lista de compras: compra solo lo que falta,
+   * redondeado a empaques completos.
+   */
+  function comprasMenosExistencia(lista, stock) {
+    return lista.map(f => {
+      const ex = Math.max((stock && stock.get(f.id)) || 0, 0);
+      const falta = Math.max(f.brutaBase - ex, 0);
+      const cont = aBase(f.presentacion, f.unidadCompra);
+      const empaques = cont > 0 ? falta / cont : 0;
+      const empaquesCompra = falta > 1e-9 ? Math.ceil(empaques - 1e-9) : 0;
+      return Object.assign({}, f, {
+        requeridoBase: f.brutaBase, existenciaBase: ex, brutaBase: falta, cubierto: falta <= 1e-9,
+        empaques, empaquesCompra, costoCompra: empaquesCompra * num(f.precio), costoUso: cont > 0 ? falta * num(f.precio) / cont : 0
+      });
+    });
+  }
+
   /* ------------------------------------------------------------ Cobranza */
 
   const sumaDias = (iso, d) => { if (!iso) return ''; const f = new Date(iso + 'T12:00:00'); f.setDate(f.getDate() + d); return f.toISOString().slice(0, 10); };
@@ -476,7 +508,7 @@
     crearIndice, porcionesReceta, rendimientoBase, fraccionSubreceta, unidadesSubreceta,
     costoLinea, costoReceta, precioConMargen, precioPorFoodCost, escalarReceta,
     nuevoAcumulado, explotarReceta, explotarPorciones, explotarServicio, explotarEvento, listaCompras,
-    costoServicio, cotizarEvento, creaCiclo, estadoCobranza, numeroALetras
+    costoServicio, cotizarEvento, creaCiclo, estadoCobranza, numeroALetras, existencias, cantidadConSigno, comprasMenosExistencia
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else raiz.Costeo = API;

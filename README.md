@@ -54,6 +54,21 @@ marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 | **Usuarios** | Solo con Firebase: cuentas, roles (Dueño, Administrador, Editor, Consulta) y solicitudes de acceso. |
 | **Ajustes** | Datos de la empresa para los documentos, IVA / margen / food cost / indirectos por omisión, modo claro u oscuro, respaldo y restauración JSON. |
 
+## Inventario
+
+- Cada **entrada, salida, merma o ajuste por conteo** es un movimiento propio (colección
+  `movimientos`); la existencia es la suma. Dos equipos pueden registrar al mismo tiempo
+  sin pisarse.
+- **Inventario**: existencia, mínimo, valor a precio de compra, último movimiento y estado
+  (suficiente, bajo mínimo, agotado), con botones rápidos de entrada y salida.
+- En la pantalla de cada insumo: existencia, existencia mínima, ubicación, botones de
+  movimiento y sus últimos movimientos.
+- **Conteo físico**: escribes lo contado y Enter ajusta la diferencia y pasa al siguiente.
+- **Movimientos**: historial filtrable; borrar uno recalcula la existencia.
+- **Conexiones**: "Descontar del inventario" en cada evento (con opción de devolver),
+  "Recibir" en los pedidos por proveedor, y la lista de **Producción y compras** resta lo
+  que ya hay en existencia. Aviso en el inicio y el tablero cuando algo baja del mínimo.
+
 ## Proveedores
 
 - **Catálogo** con tipo, contacto, teléfono, WhatsApp, correo, RFC, dirección, sitio,
