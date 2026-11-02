@@ -402,6 +402,73 @@
     return false;
   }
 
+
+  /* ------------------------------------------------------------ Cobranza */
+
+  const sumaDias = (iso, d) => { if (!iso) return ''; const f = new Date(iso + 'T12:00:00'); f.setDate(f.getDate() + d); return f.toISOString().slice(0, 10); };
+
+  /**
+   * Estado de cobranza de un evento.
+   * total: importe del evento con IVA. hoy: 'AAAA-MM-DD'.
+   * par: { anticipoPct, diasAnticipo, diasSaldo } por omisión.
+   * Plan: anticipo (pct del total) y saldo, cada uno con fecha de vencimiento
+   * (por omisión N días antes del evento; se puede fijar en ev.cobro).
+   */
+  function estadoCobranza(ev, total, hoy, par) {
+    par = par || {};
+    const cob = (ev && ev.cobro) || {};
+    const pct = cob.anticipoPct === '' || cob.anticipoPct == null ? num(par.anticipoPct != null ? par.anticipoPct : 50) : num(cob.anticipoPct);
+    total = r2(total);
+    const pagos = ((ev && ev.pagos) || []).filter(p => num(p.monto) !== 0).slice().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || '')));
+    const pagado = r2(pagos.reduce((s, p) => s + num(p.monto), 0));
+    const saldo = r2(total - pagado);
+    const anticipoMonto = r2(total * Math.min(Math.max(pct, 0), 100) / 100);
+    const venceAnticipo = cob.venceAnticipo || sumaDias(ev && ev.fecha, -num(par.diasAnticipo != null ? par.diasAnticipo : 15));
+    const venceSaldo = cob.venceSaldo || sumaDias(ev && ev.fecha, -num(par.diasSaldo != null ? par.diasSaldo : 3));
+    const estadoDe = (cubierto, vence) => cubierto ? 'pagado' : !vence ? 'sin-fecha' : vence < hoy ? 'vencido' : (new Date(vence + 'T12:00:00') - new Date(hoy + 'T12:00:00')) / 864e5 <= 3 ? 'por-vencer' : 'pendiente';
+    const anticipo = { monto: anticipoMonto, vence: venceAnticipo, falta: r2(Math.max(anticipoMonto - pagado, 0)) };
+    anticipo.estado = estadoDe(anticipo.falta <= 0.005, anticipo.vence);
+    const final = { monto: r2(total - anticipoMonto), vence: venceSaldo, falta: r2(Math.max(saldo - anticipo.falta, 0)) };
+    final.estado = estadoDe(saldo <= 0.005, final.vence);
+    let proximo = null;
+    if (anticipo.falta > 0.005) proximo = { concepto: 'Anticipo', monto: anticipo.falta, vence: anticipo.vence, estado: anticipo.estado };
+    else if (saldo > 0.005) proximo = { concepto: 'Saldo', monto: saldo, vence: final.vence, estado: final.estado };
+    const vencido = r2((anticipo.estado === 'vencido' ? anticipo.falta : 0) + (final.estado === 'vencido' ? final.falta : 0));
+    const estado = total <= 0 ? 'sin-importe' : saldo <= 0.005 ? (saldo < -0.005 ? 'sobrepago' : 'pagado') : vencido > 0 ? 'vencido' : proximo && proximo.estado === 'por-vencer' ? 'por-vencer' : 'al-corriente';
+    return { total, pagado, saldo, avance: total > 0 ? Math.min(pagado / total, 1) : 0, anticipoPct: pct, anticipo, final, proximo, vencido, estado, pagos };
+  }
+
+  /** Importe con letra para recibos: 1250.5 → "Mil doscientos cincuenta pesos 50/100 M.N." */
+  function numeroALetras(n) {
+    const U = ['', 'uno', 'dos', 'tres', 'cuatro', 'cinco', 'seis', 'siete', 'ocho', 'nueve', 'diez', 'once', 'doce', 'trece', 'catorce', 'quince', 'dieciséis', 'diecisiete', 'dieciocho', 'diecinueve', 'veinte', 'veintiuno', 'veintidós', 'veintitrés', 'veinticuatro', 'veinticinco', 'veintiséis', 'veintisiete', 'veintiocho', 'veintinueve'];
+    const D = ['', '', '', 'treinta', 'cuarenta', 'cincuenta', 'sesenta', 'setenta', 'ochenta', 'noventa'];
+    const C = ['', 'ciento', 'doscientos', 'trescientos', 'cuatrocientos', 'quinientos', 'seiscientos', 'setecientos', 'ochocientos', 'novecientos'];
+    const menorMil = x => {
+      if (x === 0) return '';
+      if (x === 100) return 'cien';
+      const c = Math.floor(x / 100), r = x % 100;
+      const dec = r < 30 ? U[r] : D[Math.floor(r / 10)] + (r % 10 ? ' y ' + U[r % 10] : '');
+      return [C[c], dec].filter(Boolean).join(' ');
+    };
+    const apocope = t => t.replace(/uno$/, 'un').replace(/veintiún$/, 'veintiún');
+    const entero = x => {
+      if (x === 0) return 'cero';
+      const mill = Math.floor(x / 1e6), miles = Math.floor((x % 1e6) / 1000), resto = x % 1000;
+      const partes = [];
+      if (mill) partes.push(mill === 1 ? 'un millón' : apocope(menorMil(mill)).replace(/veintiun$/, 'veintiún') + ' millones');
+      if (miles) partes.push(miles === 1 ? 'mil' : apocope(menorMil(miles)).replace(/veintiun$/, 'veintiún') + ' mil');
+      if (resto) partes.push(menorMil(resto));
+      return partes.join(' ');
+    };
+    const v = Math.round(Math.abs(num(n)) * 100);
+    const ent = Math.floor(v / 100), cent = v % 100;
+    let t = entero(ent);
+    t = t.replace(/uno$/, 'un').replace(/veintiun$/, 'veintiún');
+    const de = /(millón|millones)$/.test(t) ? ' de' : '';
+    t = t.charAt(0).toUpperCase() + t.slice(1);
+    return t + de + ' ' + (ent === 1 ? 'peso' : 'pesos') + ' ' + String(cent).padStart(2, '0') + '/100 M.N.';
+  }
+
   const API = {
     UNIDADES, BASE, DIM_NOMBRE, num, r2,
     dimension, unidadesDe, nombreUnidad, aBase, convertir, legible, fmtCant, fmtLegible,
@@ -409,7 +476,7 @@
     crearIndice, porcionesReceta, rendimientoBase, fraccionSubreceta, unidadesSubreceta,
     costoLinea, costoReceta, precioConMargen, precioPorFoodCost, escalarReceta,
     nuevoAcumulado, explotarReceta, explotarPorciones, explotarServicio, explotarEvento, listaCompras,
-    costoServicio, cotizarEvento, creaCiclo
+    costoServicio, cotizarEvento, creaCiclo, estadoCobranza, numeroALetras
   };
   if (typeof module !== 'undefined' && module.exports) module.exports = API;
   else raiz.Costeo = API;

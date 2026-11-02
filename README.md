@@ -54,6 +54,20 @@ marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 | **Usuarios** | Solo con Firebase: cuentas, roles (Dueño, Administrador, Editor, Consulta) y solicitudes de acceso. |
 | **Ajustes** | Datos de la empresa para los documentos, IVA / margen / food cost / indirectos por omisión, modo claro u oscuro, respaldo y restauración JSON. |
 
+## Cobranza
+
+- Todo evento **aprobado** o **realizado** entra a Cobranza con un **plan de pagos**:
+  anticipo (50 % por omisión) y saldo, que vencen 15 y 3 días antes del evento. Los
+  valores por omisión se cambian en Ajustes y se pueden ajustar en cada evento.
+- **Registrar pago**: monto sugerido (lo que falta del siguiente pago), fecha, método,
+  referencia y nota. El saldo y el estado se recalculan solos: al corriente, por
+  vencer (3 días o menos), vencido, pagado o pago de más.
+- **Recibo de pago** imprimible con folio, concepto (anticipo, abono o liquidación),
+  importe con letra y saldo restante; **estado de cuenta** con plan, pagos y saldo.
+- Datos de la **factura** del evento (folio, fecha y UUID).
+- Aviso en el inicio y en el tablero cuando hay cobros vencidos. Los pagos se guardan
+  dentro del evento, así que se sincronizan con Firebase como el resto.
+
 ## Precios referenciados
 
 - Cada insumo tiene su **pantalla propia**: precio de costeo, cotizaciones de
