@@ -67,3 +67,14 @@ seguridad está en las reglas del paso 3.
   estás escribiendo en ese momento no se pisa.
 - Consumo aproximado: unas 5 lecturas por minuto por pantalla abierta, muy
   por debajo del plan gratuito (50,000 lecturas diarias).
+
+## Sitio web y solicitudes
+
+Las reglas incluyen lo que necesita el sitio público:
+
+- `sitio/publico` y `sitio_fotos/*`: cualquiera los lee; solo administradores publican.
+- `solicitudes/*`: un visitante sin cuenta **solo puede crear** una solicitud nueva con
+  campos y tamaños limitados. Leerlas y darles seguimiento es del equipo.
+
+Cada vez que cambie `config/firestore.rules` hay que volver a publicarlas en la consola
+(Firestore Database → Reglas → pegar → Publicar).

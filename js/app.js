@@ -94,6 +94,10 @@
     escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>',
     externo: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
+    bandeja: '<path d="M3 13l2.5-8h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/>',
+    galeria: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/>',
+    portada: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/>',
     etiqueta: '<path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.4"/>',
     tablero: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
     compras: '<path d="M3 4h2l2.4 11.2a1.5 1.5 0 0 0 1.5 1.2h8.6a1.5 1.5 0 0 0 1.5-1.1L21 8H6.2"/><circle cx="9.5" cy="20" r="1.3"/><circle cx="17" cy="20" r="1.3"/>',
@@ -261,8 +265,8 @@
     const c = capaActual();
     if (!c || !c.classList.contains('capa')) return pintar('reemplazo');
     const ruta = c.dataset.ruta, r = rutaDe(ruta);
-    const vistas = { tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
-    if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; }
+    const vistas = { sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
+    if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; delete vistas.sitio; }
     if (!NUBE) delete vistas.usuarios;
     ctx = { obj: null, recalcular: null, acciones: {} };
     const pos = c.scrollTop;
@@ -1235,6 +1239,7 @@
       condiciones: 'Anticipo del 50 % para confirmar la fecha y liquidación 3 días antes del evento. Precios en MXN. Vigencia de 15 días.', creado: D.ahora(), actualizado: D.ahora()
     }, base || {});
     db.eventos.push(e); cambioEstructura(); abrir('evento-' + e.id);
+    return e;
     setTimeout(() => { const n = $('f-nombre'); if (n) { n.focus(); n.select(); } }, 50);
   }
   function vEvento(id) {
@@ -1372,6 +1377,7 @@
     const prox = (k, nombreI) => '<div class="app-ico proximo" title="Próximamente"><span class="cuadro">' + ico(k) + '</span><span class="nombre">' + nombreI + '</span></div>';
     const iconos = [
       ico2('eventos', 'eventos', 'Eventos', abiertos.length || '', ' destacado'),
+      ico2('solicitudes', 'bandeja', 'Solicitudes', (db.solicitudes || []).filter(x => x.estatus === 'nueva').length || ''),
       ico2('servicios', 'servicios', 'Servicios'),
       ico2('recetas', 'recetas', 'Recetas', conError || ''),
       btnIco('abrirEscalador', 'escalar', 'Escalar'),
@@ -1379,6 +1385,7 @@
       ico2('insumos', 'insumos', 'Insumos', db.insumos.filter(vencido).length || ''),
       ico2('tablero', 'tablero', 'Tablero')
     ];
+    if (esAdmin()) iconos.push(ico2('sitio', 'web', 'Sitio web'));
     if (NUBE && esAdmin()) iconos.push(ico2('usuarios', 'usuarios', 'Usuarios'));
     if (esAdmin()) iconos.push(ico2('ajustes', 'ajustes', 'Ajustes'));
     const resumen = [];
@@ -1581,7 +1588,7 @@
   }
 
   /* ---------------------------------------------------------- Solo lectura */
-  const ACC_LECTURA = new Set(['modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ACC_LECTURA = new Set(['filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
   const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
   function aplicarSoloLectura() {
     capaActual().querySelectorAll('input, select, textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
@@ -1708,6 +1715,134 @@
     });
     if (!N.sesion()) return pantallaAcceso();
     entrarConSesion();
+  }
+
+  /* ================================================================ SITIO WEB (administración)
+     Lo que se publica aquí lo lee la página pública (index.html). */
+  const CLAVE_SITIO = 'civizo.sitio.v1';
+  const SITIO_DEF = {
+    titulo: 'Alimentamos lo que nos une.',
+    subtitulo: 'Comedores empresariales, catering y eventos con recetas estandarizadas: el mismo sabor y la misma calidad para 10 o para 1,000 personas.',
+    nosotros: 'CIVIZO nace de una familia de cinco: Cindy, Iker, Víctor, Víctor Miguel y Zoe. Cada letra del nombre es uno de nosotros. Así entendemos la comida: como lo que reúne a las personas alrededor de una mesa. Con esa idea cocinamos para empresas y eventos, cuidando que cada plato llegue igual de bien que el primero.',
+    ciudad: 'Monterrey, N.L.', telefono: '', whatsapp: '', correo: '', horario: '',
+    lineas: ['empresarial', 'catering', 'produccion', 'operacion', 'consultoria']
+  };
+  const RANURAS = [['portada', 'Portada', 'Foto principal, vertical'], ['empresarial', 'Alimentación empresarial', 'Comedor o charola de menú'], ['catering', 'Catering y eventos', 'Montaje o buffet'], ['produccion', 'Producción de alimentos', 'Cocina en producción'], ['operacion', 'Operación de cocinas', 'Equipo trabajando'], ['consultoria', 'Proyectos y consultoría', 'Planeación o emplatado']]
+    .concat([1, 2, 3, 4, 5, 6].map(n => ['galeria' + n, 'Galería ' + n, 'Platillos y servicios']));
+  let sitio = null, cargandoSitio = false;
+  async function cargarSitio() {
+    if (NUBE) { const r = await N.leerSitio(); const c = Object.assign({}, SITIO_DEF, r.contenido || {}); delete c.id; sitio = { contenido: c, fotos: r.fotos || {} }; }
+    else { let l = null; try { l = JSON.parse(localStorage.getItem(CLAVE_SITIO) || 'null'); } catch (e) { /* */ } sitio = { contenido: Object.assign({}, SITIO_DEF, l && l.contenido), fotos: (l && l.fotos) || {} }; }
+  }
+  function guardarSitioLocal() { try { localStorage.setItem(CLAVE_SITIO, JSON.stringify(sitio)); return true; } catch (e) { aviso('El navegador no tiene espacio para más fotos. Conecta Firebase o quita alguna.', true); return false; } }
+  function comprimirImagen(file, max) {
+    return new Promise((ok, mal) => {
+      const url = URL.createObjectURL(file), img = new Image();
+      img.onload = () => {
+        const k = Math.min(1, max / Math.max(img.width, img.height));
+        const cv = document.createElement('canvas'); cv.width = Math.round(img.width * k); cv.height = Math.round(img.height * k);
+        cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+        URL.revokeObjectURL(url);
+        let q = .82, data = cv.toDataURL('image/jpeg', q);
+        while (data.length > 850000 && q > .4) { q -= .08; data = cv.toDataURL('image/jpeg', q); }
+        if (data.length > 950000) return mal(new Error('La imagen es demasiado grande aun comprimida'));
+        ok(data);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); mal(new Error('No se pudo leer la imagen')); };
+      img.src = url;
+    });
+  }
+  function vSitio() {
+    if (!sitio) {
+      ctx.alPintar = () => { if (cargandoSitio) return; cargandoSitio = true; cargarSitio().then(() => { cargandoSitio = false; render(); }).catch(() => { cargandoSitio = false; sitio = { contenido: Object.assign({}, SITIO_DEF), fotos: {} }; aviso('No se pudo leer el sitio publicado; se muestran los textos base', true); render(); }); };
+      return '<div class="cabecera"><div><span class="ceja">Página pública</span><h1>Sitio web</h1></div></div><div class="vacio"><p>Cargando lo publicado…</p></div>';
+    }
+    const c = sitio.contenido;
+    const leerForm = () => {
+      const k = capaActual(), v = id => k.querySelector('#' + id).value.trim();
+      return Object.assign({}, c, { titulo: v('sw-titulo'), subtitulo: v('sw-subtitulo'), nosotros: v('sw-nosotros'), ciudad: v('sw-ciudad'), telefono: v('sw-telefono'), whatsapp: v('sw-whatsapp'), correo: v('sw-correo'), horario: v('sw-horario'),
+        lineas: Array.from(k.querySelectorAll('[data-sw-linea]:checked')).map(x => x.value) });
+    };
+    ctx.acciones = {
+      publicarSitio: async (d, b) => {
+        const nuevo = leerForm();
+        if (!nuevo.titulo) return aviso('Escribe el título de la portada', true);
+        if (!nuevo.lineas.length) return aviso('Deja visible al menos un servicio', true);
+        b.disabled = true;
+        try { sitio.contenido = nuevo; if (NUBE) await N.guardarSitio(nuevo); else guardarSitioLocal(); aviso('Cambios publicados en el sitio'); }
+        catch (e) { aviso(e.message === 'SIN_PERMISO' ? 'Publica primero las reglas nuevas de Firestore (config/firestore.rules)' : 'No se pudo publicar: ' + e.message, true); }
+        b.disabled = false;
+      },
+      subirFoto: d => elegirImagen(async file => {
+        try {
+          aviso('Preparando la foto…');
+          const data = await comprimirImagen(file, d.slot === 'portada' ? 1600 : 1400);
+          if (NUBE) await N.guardarFoto(d.slot, data);
+          sitio.fotos[d.slot] = data;
+          if (!NUBE && !guardarSitioLocal()) { delete sitio.fotos[d.slot]; return; }
+          render(); aviso('Foto publicada');
+        } catch (e) { aviso(e.message === 'SIN_PERMISO' ? 'Publica primero las reglas nuevas de Firestore' : e.message, true); }
+      }),
+      quitarFoto: d => confirmar('Quitar foto', 'La página volverá a mostrar el diseño de la marca en este espacio.', 'Quitar', async () => {
+        try { if (NUBE) await N.borrarFoto(d.slot); delete sitio.fotos[d.slot]; if (!NUBE) guardarSitioLocal(); render(); aviso('Foto quitada'); } catch (e) { aviso('No se pudo quitar', true); }
+      })
+    };
+    const campo = (id, etq, valor, extra) => '<label class="campo' + (extra && extra.ancho ? ' ancho' : '') + '"><span>' + etq + '</span>' + (extra && extra.area ? '<textarea id="' + id + '" rows="' + (extra.filas || 3) + '" data-libre>' + esc(valor) + '</textarea>' : '<input type="' + ((extra && extra.tipo) || 'text') + '" id="' + id + '" value="' + esc(valor) + '" autocomplete="off" data-libre' + (extra && extra.ph ? ' placeholder="' + esc(extra.ph) + '"' : '') + '>') + (extra && extra.ayuda ? '<small>' + extra.ayuda + '</small>' : '') + '</label>';
+    const fotos = RANURAS.map(([slot, nombre, sug]) => {
+      const f = sitio.fotos[slot];
+      return '<div class="ranura' + (slot === 'portada' ? ' vertical' : '') + '"><div class="ranura-img">' + (f ? '<img src="' + f + '" alt="' + esc(nombre) + '">' : '<div class="ranura-vacia">' + ico(slot.startsWith('galeria') ? 'galeria' : (ICO[slot] ? slot : 'galeria')) + '</div>') + '</div>'
+        + '<div class="ranura-txt"><b>' + nombre + '</b><span class="tenue">' + sug + '</span></div>'
+        + '<div class="acciones"><button class="btn chico" data-accion="subirFoto" data-slot="' + slot + '">' + ico('subir') + (f ? 'Cambiar' : 'Subir') + '</button>' + (f ? '<button class="icono-btn" data-accion="quitarFoto" data-slot="' + slot + '" aria-label="Quitar foto">✕</button>' : '') + '</div></div>';
+    }).join('');
+    return '<div class="cabecera"><div><span class="ceja">Página pública</span><h1>Sitio web</h1></div><div class="acciones"><a class="btn" href="index.html" target="_blank" rel="noopener">' + ico('externo') + 'Ver sitio</a><button class="btn primario" data-accion="publicarSitio">' + ico('check') + 'Publicar cambios</button></div></div>'
+      + '<div class="rejilla r-lateral"><div class="rejilla">'
+      + '<section class="panel"><div class="panel-cab"><div><h2>Textos de la portada</h2><p>Lo primero que ve un cliente. Corto y claro.</p></div></div><div class="campos">'
+      + campo('sw-titulo', 'Título', c.titulo, { ancho: true }) + campo('sw-subtitulo', 'Subtítulo', c.subtitulo, { ancho: true, area: true, filas: 2 }) + campo('sw-nosotros', 'Nosotros', c.nosotros, { ancho: true, area: true, filas: 5 }) + '</div></section>'
+      + '<section class="panel"><div class="panel-cab"><div><h2>Fotos</h2><p>Se ajustan y comprimen solas. Sin foto, el espacio muestra el diseño de la marca.</p></div></div><div class="ranuras">' + fotos + '</div></section></div>'
+      + '<aside class="pegajoso rejilla"><section class="panel"><h2>Contacto</h2><div class="campos" style="grid-template-columns:minmax(0,1fr)">'
+      + campo('sw-whatsapp', 'WhatsApp', c.whatsapp, { tipo: 'tel', ph: '81 1234 5678', ayuda: 'Activa el botón de WhatsApp en la página' }) + campo('sw-telefono', 'Teléfono', c.telefono, { tipo: 'tel' }) + campo('sw-correo', 'Correo', c.correo, { tipo: 'email' }) + campo('sw-ciudad', 'Ciudad', c.ciudad) + campo('sw-horario', 'Horario', c.horario, { ph: 'Lunes a sábado, 8:00 a 18:00' })
+      + '</div></section><section class="panel"><h2>Servicios visibles</h2><div class="chips-sel">' + D.LINEAS.map(l => '<label><input type="checkbox" data-sw-linea data-libre value="' + l.id + '"' + (c.lineas.includes(l.id) ? ' checked' : '') + '>' + l.nombre + '</label>').join('') + '</div></section>'
+      + '<section class="panel"><h2>Fotos que venden</h2><ul class="consejos"><li>Luz natural, de lado; sin flash.</li><li>Fondos oscuros o madera: combinan con el carbón de la marca.</li><li>Un detalle naranja (servilleta, salsa, cítrico) une la foto con el logo.</li><li>Personas del equipo con uniforme CIVIZO generan confianza.</li><li>Usa solo fotos propias o con licencia para uso comercial.</li></ul></section></aside></div>';
+  }
+  function elegirImagen(alElegir) {
+    const inp = document.createElement('input');
+    inp.type = 'file'; inp.accept = 'image/*';
+    inp.onchange = () => { if (inp.files[0]) alElegir(inp.files[0]); };
+    inp.click();
+  }
+
+  /* ================================================================ SOLICITUDES (desde el sitio) */
+  const ESTATUS_SOL = [['nueva', 'Nueva', 'acento'], ['contactada', 'En seguimiento', 'info'], ['cotizada', 'Cotizada', 'ok'], ['descartada', 'Descartada', '']];
+  const filtroSol = { est: '' };
+  function vSolicitudes() {
+    const lista = (db.solicitudes || []).slice().sort((a, b) => String(b.creado || '').localeCompare(String(a.creado || '')));
+    const nNuevas = lista.filter(s => s.estatus === 'nueva').length;
+    if (!filtroSol.est) filtroSol.est = nNuevas ? 'nueva' : 'todas';
+    const vis = lista.filter(s => filtroSol.est === 'todas' || s.estatus === filtroSol.est);
+    const pillSol = id => { const e = ESTATUS_SOL.find(x => x[0] === id) || ESTATUS_SOL[0]; return '<span class="pill ' + e[2] + '">' + e[1] + '</span>'; };
+    const tarjeta = s => {
+      const tel = String(s.telefono || '').replace(/[^\d+]/g, ''), wa = tel.replace(/\D/g, '');
+      return '<article class="solicitud"><div class="sol-cab"><div><b>' + esc(s.nombre) + '</b>' + (s.empresa ? '<span class="tenue"> · ' + esc(s.empresa) + '</span>' : '') + '<br><span class="tenue">Recibida ' + textoEdad(s.creado).toLowerCase() + ' · ' + esc(s.origen || 'sitio web') + '</span></div>' + pillSol(s.estatus) + '</div>'
+        + '<div class="sol-datos"><span>' + ico('servicios') + esc(s.servicio || 'Sin especificar') + '</span><span>' + ico('eventos') + (s.fecha ? fechaCorta(s.fecha) : 'Sin fecha') + '</span><span>' + ico('usuarios') + (C.num(s.personas) ? n0(s.personas) + ' personas' : 'Personas sin definir') + '</span></div>'
+        + (s.mensaje ? '<p class="sol-msj">' + esc(s.mensaje) + '</p>' : '')
+        + '<div class="sol-contacto">' + (tel ? '<a class="btn chico" href="tel:' + esc(tel) + '">' + esc(s.telefono) + '</a>' : '') + (wa.length >= 10 ? '<a class="btn chico" href="https://wa.me/' + (wa.length === 10 ? '52' + wa : wa) + '" target="_blank" rel="noopener">WhatsApp</a>' : '') + (s.correo ? '<a class="btn chico" href="mailto:' + esc(s.correo) + '">' + esc(s.correo) + '</a>' : '') + '</div>'
+        + '<div class="acciones">' + (s.eventoId && db.eventos.some(e => e.id === s.eventoId) ? '<a class="btn chico" href="#evento-' + s.eventoId + '">' + ico('eventos') + 'Ver evento</a>' : '<button class="btn chico primario" data-accion="solEvento" data-id="' + s.id + '">' + ico('mas') + 'Crear evento</button>')
+        + (s.estatus === 'nueva' ? '<button class="btn chico" data-accion="solEstatus" data-id="' + s.id + '" data-est="contactada">Marcar en seguimiento</button>' : '')
+        + (s.estatus !== 'descartada' ? '<button class="btn chico fantasma" data-accion="solEstatus" data-id="' + s.id + '" data-est="descartada">Descartar</button>' : '<button class="btn chico fantasma" data-accion="solEstatus" data-id="' + s.id + '" data-est="nueva">Reabrir</button>') + '</div></article>';
+    };
+    ctx.acciones = {
+      filtroSol: d => { filtroSol.est = d.est; render(); },
+      solEstatus: d => { const s = db.solicitudes.find(x => x.id === d.id); if (!s) return; s.estatus = d.est; s.actualizado = D.ahora(); guardar(true); render(); },
+      solEvento: d => {
+        const s = db.solicitudes.find(x => x.id === d.id); if (!s) return;
+        const e = nuevoEvento({ nombre: (s.servicio || 'Evento') + ' · ' + (s.empresa || s.nombre), cliente: s.empresa || s.nombre, contacto: s.nombre, telefono: s.telefono || '', fecha: s.fecha || '', personas: C.num(s.personas) || 50, notas: 'Solicitud del sitio web' + (s.correo ? ' (' + s.correo + ')' : '') + (s.mensaje ? ': ' + s.mensaje : '') });
+        s.estatus = 'cotizada'; s.eventoId = e.id; s.actualizado = D.ahora(); guardar(true);
+      }
+    };
+    return '<div class="cabecera"><div><span class="ceja">Desde el sitio web</span><h1>Solicitudes</h1></div><div class="acciones"><a class="btn" href="index.html#contacto" target="_blank" rel="noopener">' + ico('externo') + 'Ver formulario</a></div></div>'
+      + '<div class="pestanas">' + [['nueva', 'Nuevas'], ['contactada', 'En seguimiento'], ['cotizada', 'Cotizadas'], ['descartada', 'Descartadas'], ['todas', 'Todas']].map(f => { const n = f[0] === 'todas' ? lista.length : lista.filter(s => s.estatus === f[0]).length; return '<button class="' + (filtroSol.est === f[0] ? 'activa' : '') + '" data-accion="filtroSol" data-est="' + f[0] + '">' + f[1] + (n ? ' · ' + n : '') + '</button>'; }).join('') + '</div>'
+      + (vis.length ? '<div class="solicitudes">' + vis.map(tarjeta).join('') + '</div>'
+        : '<div class="vacio"><h3>' + (lista.length ? 'Nada en esta lista' : 'Aún no llegan solicitudes') + '</h3><p>Cuando alguien llene el formulario de tu sitio, aparecerá aquí para que le des seguimiento o lo conviertas en evento.</p><a class="btn primario" href="index.html#contacto" target="_blank" rel="noopener">' + ico('externo') + 'Ver el formulario</a></div>');
   }
 
   /* ================================================================ AJUSTES */

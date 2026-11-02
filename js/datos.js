@@ -58,7 +58,7 @@
       version: 1,
       empresa: { nombre: 'CIVIZO', lema: 'Servicios Alimentarios', responsable: '', telefono: '', correo: '', ciudad: 'Monterrey, N.L.' },
       parametros: { iva: 16, margen: 35, foodCost: 30, indirectos: 8, diasVigencia: 30 },
-      insumos: [], recetas: [], servicios: [], eventos: []
+      insumos: [], recetas: [], servicios: [], eventos: [], solicitudes: []
     };
   }
 
@@ -69,7 +69,7 @@
     const out = Object.assign(b, d);
     out.empresa = Object.assign(vacio().empresa, d.empresa || {});
     out.parametros = Object.assign(vacio().parametros, d.parametros || {});
-    ['insumos', 'recetas', 'servicios', 'eventos'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
+    ['insumos', 'recetas', 'servicios', 'eventos', 'solicitudes'].forEach(k => { if (!Array.isArray(out[k])) out[k] = []; });
     out.insumos.forEach(i => { if (!Array.isArray(i.cotizaciones)) i.cotizaciones = []; if (!Array.isArray(i.historial)) i.historial = []; });
     out.recetas.forEach(r => { r.ingredientes = r.ingredientes || []; r.alergenos = r.alergenos || []; });
     out.servicios.forEach(s => { s.componentes = s.componentes || []; });

@@ -62,9 +62,32 @@ service cloud.firestore {
       allow write: if esAdmin();
     }
 
+    // Sitio web público: cualquiera lee; solo administradores publican.
+    match /sitio/publico {
+      allow read: if true;
+      allow write: if esAdmin();
+    }
+    match /sitio_fotos/{slot} {
+      allow read: if true;
+      allow create, update: if esAdmin() && request.resource.data.data is string && request.resource.data.data.size() < 1000000;
+      allow delete: if esAdmin();
+    }
+
+    // Solicitudes de cotización: el público solo puede crear una solicitud
+    // nueva con campos y tamaños acotados. Leer y dar seguimiento es del equipo.
+    function texto(c, max) { return request.resource.data.get(c, '') is string && request.resource.data.get(c, '').size() <= max; }
+    match /solicitudes/{id} {
+      allow create: if request.resource.data.keys().hasOnly(['nombre', 'empresa', 'telefono', 'correo', 'servicio', 'fecha', 'personas', 'mensaje', 'estatus', 'creado', 'actualizado', 'origen'])
+        && request.resource.data.estatus == 'nueva'
+        && request.resource.data.nombre is string && request.resource.data.nombre.size() >= 2 && request.resource.data.nombre.size() <= 120
+        && texto('telefono', 40) && texto('correo', 160) && texto('empresa', 160) && texto('servicio', 60)
+        && texto('fecha', 10) && texto('mensaje', 2000) && texto('creado', 40) && texto('actualizado', 40) && texto('origen', 40)
+        && request.resource.data.get('personas', 0) is int && request.resource.data.get('personas', 0) >= 0 && request.resource.data.get('personas', 0) <= 100000;
+    }
+
     match /{col}/{id} {
-      allow read: if conAcceso() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados'];
-      allow write: if puedeEditar() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados'];
+      allow read: if conAcceso() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados', 'solicitudes'];
+      allow write: if puedeEditar() && col in ['insumos', 'recetas', 'servicios', 'eventos', 'borrados', 'solicitudes'];
     }
   }
 }

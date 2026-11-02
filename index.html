@@ -3,34 +3,254 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>CIVIZO Cocina</title>
-<meta name="description" content="Costeo de servicios de alimentos y eventos, recetas estandarizadas y escalado de producción.">
-<meta name="theme-color" content="#F6F5F3">
+<title>CIVIZO · Servicios alimentarios en Monterrey</title>
+<meta name="description" content="Comedores empresariales, catering y eventos con recetas estandarizadas: el mismo sabor y la misma calidad para 10 o para 1,000 personas. Monterrey, N.L.">
+<meta name="theme-color" content="#1F1F1F">
+<meta property="og:title" content="CIVIZO · Alimentamos lo que nos une">
+<meta property="og:description" content="Comedores empresariales, catering y eventos con recetas estandarizadas en Monterrey, N.L.">
+<meta property="og:type" content="website">
+<meta property="og:image" content="assets/sitio/marca.jpg">
 <link rel="icon" type="image/png" href="assets/marca/favicon.png">
-<link rel="manifest" href="manifest.json">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Poppins:wght@400;500;600&display=swap">
-<link rel="stylesheet" href="css/civizo.css?v=4">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&family=Poppins:wght@400;500&display=swap">
+<link rel="stylesheet" href="css/sitio.css?v=1">
 </head>
 <body>
-<template id="tplIsotipo"><svg class="isotipo" viewBox="215 85 370 135" aria-hidden="true"><g fill="none" stroke-linecap="round"><g class="fig"><circle cx="260" cy="100" r="12" stroke="none"/><path d="M238 159 Q240 127 260 127 Q280 127 282 159" stroke-width="10"/><circle cx="330" cy="100" r="12" stroke="none"/><path d="M308 159 Q310 127 330 127 Q350 127 352 159" stroke-width="10"/><circle cx="470" cy="100" r="12" stroke="none"/><path d="M448 159 Q450 127 470 127 Q490 127 492 159" stroke-width="10"/><circle cx="540" cy="100" r="12" stroke="none"/><path d="M518 159 Q520 127 540 127 Q560 127 562 159" stroke-width="10"/></g><g class="acento"><circle cx="400" cy="100" r="12" stroke="none"/><path d="M378 159 Q380 127 400 127 Q420 127 422 159" stroke-width="10"/><path d="M225 178 Q400 212 575 178" stroke-width="8"/></g></g></svg></template>
-<main class="capas" id="vista"></main>
-<div class="modal-fondo" id="modal" hidden>
-  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
-    <header class="modal-cab"><button class="barra-btn" type="button" data-cerrar aria-label="Regresar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2 id="modalTitulo"></h2></header>
-    <div class="modal-cuerpo" id="modalCuerpo"></div>
-    <footer class="modal-pie" id="modalPie"></footer>
-  </div>
-</div>
-<div class="aviso" id="aviso" role="status" hidden></div>
-<div class="estado" id="estado" aria-live="polite"><i></i><span></span></div>
-<div id="impresion" aria-hidden="true"></div>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <defs>
+    <symbol id="isotipo" viewBox="215 85 370 135"><g fill="none" stroke-linecap="round"><g><circle cx="260" cy="100" r="12" fill="currentColor"/><path d="M238 159 Q240 127 260 127 Q280 127 282 159" stroke="currentColor" stroke-width="10"/><circle cx="330" cy="100" r="12" fill="currentColor"/><path d="M308 159 Q310 127 330 127 Q350 127 352 159" stroke="currentColor" stroke-width="10"/><circle cx="470" cy="100" r="12" fill="currentColor"/><path d="M448 159 Q450 127 470 127 Q490 127 492 159" stroke="currentColor" stroke-width="10"/><circle cx="540" cy="100" r="12" fill="currentColor"/><path d="M518 159 Q520 127 540 127 Q560 127 562 159" stroke="currentColor" stroke-width="10"/></g><g><circle cx="400" cy="100" r="12" fill="#F26522"/><path d="M378 159 Q380 127 400 127 Q420 127 422 159" stroke="#F26522" stroke-width="10"/><path d="M225 178 Q400 212 575 178" stroke="#F26522" stroke-width="8"/></g></g></symbol>
+    <symbol id="i-empresarial" viewBox="0 0 24 24"><path d="M2.5 19h19"/><path d="M4.5 19a7.5 7.5 0 0 1 15 0"/><path d="M12 11.5V9"/><path d="M10.3 9h3.4"/></symbol>
+    <symbol id="i-catering" viewBox="0 0 24 24"><path d="M7 18h10v3H7z"/><path d="M7 18v-4.3A4 4 0 0 1 6 6a5 5 0 0 1 6-3 5 5 0 0 1 6 3 4 4 0 0 1-1 7.7V18"/></symbol>
+    <symbol id="i-produccion" viewBox="0 0 24 24"><path d="M12 3l9 4.5-9 4.5-9-4.5L12 3z"/><path d="M3 12l9 4.5 9-4.5"/><path d="M3 16.5L12 21l9-4.5"/></symbol>
+    <symbol id="i-operacion" viewBox="0 0 24 24"><path d="M12 2.5l2 2.2 3-.4.7 2.9 2.7 1.4-1.1 2.8 1.1 2.8-2.7 1.4-.7 2.9-3-.4-2 2.2-2-2.2-3 .4-.7-2.9-2.7-1.4 1.1-2.8-1.1-2.8 2.7-1.4.7-2.9 3 .4z"/><path d="M8.8 12.2l2.2 2.2 4.2-4.4"/></symbol>
+    <symbol id="i-consultoria" viewBox="0 0 24 24"><path d="M4 20h16"/><rect x="5" y="13" width="3" height="5"/><rect x="10.5" y="9" width="3" height="9"/><rect x="16" y="5" width="3" height="13"/></symbol>
+    <symbol id="i-escala" viewBox="0 0 24 24"><path d="M4 20L20 4M14 4h6v6M4 14v6h6"/></symbol>
+    <symbol id="i-precio" viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8L3 12z"/><circle cx="7.5" cy="8.5" r="1.4"/></symbol>
+    <symbol id="i-escudo" viewBox="0 0 24 24"><path d="M12 3l8 3v6c0 4.5-3.4 8-8 9-4.6-1-8-4.5-8-9V6l8-3z"/><path d="M8.5 12l2.5 2.5 4.5-5"/></symbol>
+    <symbol id="i-gente" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4.6a3.5 3.5 0 0 1 0 6.8M18 14.2a6.5 6.5 0 0 1 3.5 5.8"/></symbol>
+    <symbol id="i-whats" viewBox="0 0 24 24"><path d="M4 20l1.3-4A8 8 0 1 1 8 19l-4 1z"/><path d="M9 8.5c.2 2.8 3 5.6 6 6l1.2-1.4-1.9-1-1 .8c-1-.5-2.2-1.6-2.6-2.6l.8-1-1-1.9L9 8.5z"/></symbol>
+    <symbol id="i-flecha" viewBox="0 0 24 24"><path d="M5 12h14M13 6l6 6-6 6"/></symbol>
+    <symbol id="i-check" viewBox="0 0 24 24"><path d="M5 12.5l4.5 4.5L19 7.5"/></symbol>
+  </defs>
+</svg>
 
-<script src="js/config.js?v=4"></script>
-<script src="js/nube.js?v=4"></script>
-<script src="js/costeo.js?v=4"></script>
-<script src="js/datos.js?v=4"></script>
-<script src="js/app.js?v=4"></script>
+<header class="cab" id="cab">
+  <div class="envoltura cab-in">
+    <a class="logo" href="#inicio" aria-label="CIVIZO, inicio"><svg class="iso"><use href="#isotipo"/></svg><span><b>CIVIZO</b><small>Servicios alimentarios</small></span></a>
+    <nav class="nav" id="nav" aria-label="Secciones">
+      <a href="#servicios">Servicios</a>
+      <a href="#como-trabajamos">Cómo trabajamos</a>
+      <a href="#nosotros">Nosotros</a>
+      <a href="#contacto">Contacto</a>
+      <a class="acceso" href="app.html">Acceso</a>
+    </nav>
+    <a class="boton chico" href="#contacto">Cotiza tu evento</a>
+    <button class="menu-btn" id="menuBtn" type="button" aria-label="Abrir menú" aria-expanded="false" aria-controls="nav"><span></span><span></span></button>
+  </div>
+</header>
+
+<main id="inicio">
+  <!-- Portada -->
+  <section class="portada">
+    <div class="envoltura portada-in">
+      <div class="portada-txt">
+        <span class="ceja"><i></i><span data-txt="ciudad">Monterrey, N.L.</span> · Servicios alimentarios</span>
+        <h1 data-txt="titulo">Alimentamos lo que nos une.</h1>
+        <p class="lead" data-txt="subtitulo">Comedores empresariales, catering y eventos con recetas estandarizadas: el mismo sabor y la misma calidad para 10 o para 1,000 personas.</p>
+        <div class="ctas">
+          <a class="boton" href="#contacto">Cotiza tu evento <svg><use href="#i-flecha"/></svg></a>
+          <a class="boton fantasma" href="#servicios">Ver servicios</a>
+        </div>
+        <ul class="sellos">
+          <li><svg><use href="#i-check"/></svg>Recetas estandarizadas</li>
+          <li><svg><use href="#i-check"/></svg>Precio claro por persona</li>
+          <li><svg><use href="#i-check"/></svg>Servicio en sitio</li>
+        </ul>
+      </div>
+      <div class="portada-media">
+        <figure class="media grande" data-foto="portada">
+          <div class="arte arte-portada" aria-hidden="true">
+            <svg class="iso-gigante"><use href="#isotipo"/></svg>
+            <span class="arte-marca">CIVIZO</span>
+            <span class="arte-lema">Servicios alimentarios</span>
+          </div>
+        </figure>
+        <div class="tarjeta-flotante" aria-hidden="true">
+          <svg><use href="#i-escala"/></svg>
+          <div><b>De 10 a 1,000</b><span>porciones con la misma receta</span></div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Pilares -->
+  <section class="banda">
+    <div class="envoltura pilares">
+      <div><svg><use href="#i-escala"/></svg><b>Mismo sabor a cualquier escala</b><span>Cada platillo tiene ficha técnica con cantidades y procedimiento.</span></div>
+      <div><svg><use href="#i-precio"/></svg><b>Precios claros</b><span>Cotizaciones por persona que dicen exactamente qué incluyen.</span></div>
+      <div><svg><use href="#i-escudo"/></svg><b>Inocuidad y control</b><span>Temperaturas, higiene y trazabilidad en cada etapa.</span></div>
+      <div><svg><use href="#i-gente"/></svg><b>Un equipo comprometido</b><span>Una empresa familiar que cuida cada servicio como propio.</span></div>
+    </div>
+  </section>
+
+  <!-- Servicios -->
+  <section class="seccion" id="servicios">
+    <div class="envoltura">
+      <div class="titular">
+        <span class="ceja"><i></i>Lo que hacemos</span>
+        <h2>Cinco formas de llevar buena comida a tu gente</h2>
+      </div>
+      <div class="servicios" id="listaServicios">
+        <article class="servicio destacado" data-linea="empresarial">
+          <figure class="media" data-foto="empresarial"><div class="arte"><svg><use href="#i-empresarial"/></svg></div></figure>
+          <div class="servicio-txt"><h3>Alimentación empresarial</h3><p>Comedores y menús diarios para tu equipo, con rotación semanal, porciones controladas y servicio puntual.</p><a class="enlace" href="#contacto" data-servicio="Alimentación empresarial">Cotizar <svg><use href="#i-flecha"/></svg></a></div>
+        </article>
+        <article class="servicio destacado" data-linea="catering">
+          <figure class="media" data-foto="catering"><div class="arte"><svg><use href="#i-catering"/></svg></div></figure>
+          <div class="servicio-txt"><h3>Catering y eventos</h3><p>Desayunos, coffee breaks, comidas y banquetes, con montaje y personal de servicio.</p><a class="enlace" href="#contacto" data-servicio="Catering y eventos">Cotizar <svg><use href="#i-flecha"/></svg></a></div>
+        </article>
+        <article class="servicio" data-linea="produccion">
+          <figure class="media" data-foto="produccion"><div class="arte"><svg><use href="#i-produccion"/></svg></div></figure>
+          <div class="servicio-txt"><h3>Producción de alimentos</h3><p>Producción por volumen con fichas técnicas: bases, salsas, guarniciones y platillos listos.</p><a class="enlace" href="#contacto" data-servicio="Producción de alimentos">Cotizar <svg><use href="#i-flecha"/></svg></a></div>
+        </article>
+        <article class="servicio" data-linea="operacion">
+          <figure class="media" data-foto="operacion"><div class="arte"><svg><use href="#i-operacion"/></svg></div></figure>
+          <div class="servicio-txt"><h3>Operación de cocinas</h3><p>Operamos tu cocina: personal, procesos, compras e higiene, con indicadores claros.</p><a class="enlace" href="#contacto" data-servicio="Operación de cocinas">Cotizar <svg><use href="#i-flecha"/></svg></a></div>
+        </article>
+        <article class="servicio" data-linea="consultoria">
+          <figure class="media" data-foto="consultoria"><div class="arte"><svg><use href="#i-consultoria"/></svg></div></figure>
+          <div class="servicio-txt"><h3>Proyectos y consultoría</h3><p>Diseño de menús, costeo, estandarización de recetas y apertura de cocinas.</p><a class="enlace" href="#contacto" data-servicio="Proyectos y consultoría">Cotizar <svg><use href="#i-flecha"/></svg></a></div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- Proceso -->
+  <section class="seccion suave" id="como-trabajamos">
+    <div class="envoltura">
+      <div class="titular">
+        <span class="ceja"><i></i>Cómo trabajamos</span>
+        <h2>De la primera llamada al último plato</h2>
+      </div>
+      <ol class="proceso">
+        <li><span class="paso">01</span><b>Platícanos</b><p>Tipo de evento, fecha, número de personas y lo que imaginas.</p></li>
+        <li><span class="paso">02</span><b>Diseñamos tu menú</b><p>Te proponemos platillos según tu presupuesto y tus invitados.</p></li>
+        <li><span class="paso">03</span><b>Cotización clara</b><p>Precio por persona y todo lo que incluye, sin sorpresas.</p></li>
+        <li><span class="paso">04</span><b>Producimos</b><p>Con recetas estandarizadas y control de calidad en cocina.</p></li>
+        <li><span class="paso">05</span><b>Servimos</b><p>Montaje, servicio y retiro. Tú solo disfrutas.</p></li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Nosotros -->
+  <section class="seccion oscura" id="nosotros">
+    <div class="envoltura nosotros">
+      <div>
+        <span class="ceja"><i></i>Nosotros</span>
+        <h2>Un nombre, cinco personas, una mesa</h2>
+        <p class="lead" data-txt="nosotros">CIVIZO nace de una familia de cinco: Cindy, Iker, Víctor, Víctor Miguel y Zoe. Cada letra del nombre es uno de nosotros. Así entendemos la comida: como lo que reúne a las personas alrededor de una mesa. Con esa idea cocinamos para empresas y eventos, cuidando que cada plato llegue igual de bien que el primero.</p>
+      </div>
+      <div class="nombre" aria-label="C de Cindy, I de Iker, V de Víctor, I de Víctor Miguel, ZO de Zoe">
+        <div><span class="letra gris">C</span><small>Cindy</small></div>
+        <div><span class="letra">I</span><small>Iker</small></div>
+        <div><span class="letra naranja">V</span><small>Víctor</small></div>
+        <div><span class="letra">I</span><small>Víctor Miguel</small></div>
+        <div><span class="letra naranja">ZO</span><small>Zoe</small></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Identidad -->
+  <section class="seccion" id="identidad">
+    <div class="envoltura">
+      <div class="titular fila">
+        <div><span class="ceja"><i></i>Identidad</span><h2>Así nos verás llegar</h2></div>
+        <p class="nota-sec">Uniformes, empaques y unidades con la misma imagen: una sola marca de la cocina a tu mesa.</p>
+      </div>
+      <div class="carrusel">
+        <figure><img src="assets/sitio/filipina.jpg" alt="Filipina de chef blanca con vivos naranjas y el logotipo de CIVIZO" width="290" height="296"><figcaption>Filipina de cocina</figcaption></figure>
+        <figure><img src="assets/sitio/mandil.jpg" alt="Mandil negro con detalles naranjas y el logotipo de CIVIZO" width="276" height="296"><figcaption>Mandil de servicio</figcaption></figure>
+        <figure><img src="assets/sitio/empaque.jpg" alt="Caja de alimentos blanca con franjas naranja y gris y el logotipo de CIVIZO" width="289" height="296"><figcaption>Empaque para llevar</figcaption></figure>
+        <figure><img src="assets/sitio/camioneta.jpg" alt="Camioneta de reparto blanca con la imagen de CIVIZO" width="368" height="296"><figcaption>Unidad de reparto</figcaption></figure>
+        <figure><img src="assets/sitio/tarjeta.jpg" alt="Tarjetas de presentación de CIVIZO en negro y blanco" width="287" height="296"><figcaption>Atención directa</figcaption></figure>
+      </div>
+    </div>
+  </section>
+
+  <!-- Galería (aparece cuando hay fotos) -->
+  <section class="seccion suave" id="galeria" hidden>
+    <div class="envoltura">
+      <div class="titular"><span class="ceja"><i></i>Galería</span><h2>Nuestra cocina</h2></div>
+      <div class="galeria" id="galeriaFotos"></div>
+    </div>
+  </section>
+
+  <!-- Contacto -->
+  <section class="seccion" id="contacto">
+    <div class="envoltura contacto">
+      <div class="contacto-info">
+        <span class="ceja"><i></i>Contacto</span>
+        <h2>Cuéntanos de tu evento</h2>
+        <p class="lead">Te respondemos con una propuesta de menú y una cotización clara.</p>
+        <ul class="datos" id="datosContacto">
+          <li data-dato="ciudad"><b>Ciudad</b><span data-txt="ciudad">Monterrey, N.L.</span></li>
+        </ul>
+        <a class="boton whats" id="btnWhats" href="#" target="_blank" rel="noopener" hidden><svg><use href="#i-whats"/></svg>Escríbenos por WhatsApp</a>
+      </div>
+      <form class="formulario" id="formSolicitud" novalidate>
+        <div class="dos">
+          <label><span>Nombre *</span><input name="nombre" type="text" autocomplete="name" required maxlength="120"></label>
+          <label><span>Empresa</span><input name="empresa" type="text" autocomplete="organization" maxlength="160"></label>
+        </div>
+        <div class="dos">
+          <label><span>Teléfono *</span><input name="telefono" type="tel" autocomplete="tel" required maxlength="40"></label>
+          <label><span>Correo</span><input name="correo" type="email" autocomplete="email" maxlength="160"></label>
+        </div>
+        <label><span>¿Qué necesitas?</span>
+          <select name="servicio">
+            <option>Catering y eventos</option>
+            <option>Alimentación empresarial</option>
+            <option>Producción de alimentos</option>
+            <option>Operación de cocinas</option>
+            <option>Proyectos y consultoría</option>
+            <option>Otro</option>
+          </select>
+        </label>
+        <div class="dos">
+          <label><span>Fecha del evento</span><input name="fecha" type="date"></label>
+          <label><span>Personas</span><input name="personas" type="number" min="1" max="100000" inputmode="numeric"></label>
+        </div>
+        <label><span>Cuéntanos más</span><textarea name="mensaje" rows="4" maxlength="2000" placeholder="Tipo de evento, horario, ideas de menú, restricciones alimentarias…"></textarea></label>
+        <label class="trampa" aria-hidden="true"><span>Sitio web</span><input name="sitio_web" type="text" tabindex="-1" autocomplete="off"></label>
+        <p class="form-error" id="formError" role="alert"></p>
+        <button class="boton ancho" type="submit" id="btnEnviar">Enviar solicitud <svg><use href="#i-flecha"/></svg></button>
+        <p class="legal">Usaremos tus datos solo para responder tu solicitud.</p>
+      </form>
+      <div class="gracias" id="gracias" hidden>
+        <svg><use href="#i-check"/></svg>
+        <h3>¡Gracias! Recibimos tu solicitud.</h3>
+        <p>Te contactaremos muy pronto con una propuesta.</p>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="pie">
+  <div class="envoltura pie-in">
+    <div class="logo claro"><svg class="iso"><use href="#isotipo"/></svg><span><b>CIVIZO</b><small>Servicios alimentarios</small></span></div>
+    <p>Alimentamos lo que nos une.</p>
+    <nav aria-label="Pie de página"><a href="#servicios">Servicios</a><a href="#nosotros">Nosotros</a><a href="#contacto">Contacto</a><a href="app.html">Acceso al sistema</a></nav>
+    <small>© <span id="anio">2026</span> CIVIZO · <span data-txt="ciudad">Monterrey, N.L.</span></small>
+  </div>
+</footer>
+
+<a class="whats-flotante" id="whatsFlotante" href="#" target="_blank" rel="noopener" aria-label="Escríbenos por WhatsApp" hidden><svg><use href="#i-whats"/></svg></a>
+
+<script src="js/config.js?v=5"></script>
+<script src="js/nube.js?v=5"></script>
+<script src="js/costeo.js?v=5"></script>
+<script src="js/datos.js?v=5"></script>
+<script src="js/sitio.js?v=1"></script>
 </body>
 </html>

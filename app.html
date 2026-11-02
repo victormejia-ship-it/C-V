@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>CIVIZO Cocina</title>
+<meta name="description" content="Costeo de servicios de alimentos y eventos, recetas estandarizadas y escalado de producción.">
+<meta name="theme-color" content="#F6F5F3">
+<link rel="icon" type="image/png" href="assets/marca/favicon.png">
+<link rel="manifest" href="manifest.json">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700;800&family=Poppins:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="css/civizo.css?v=5">
+</head>
+<body>
+<template id="tplIsotipo"><svg class="isotipo" viewBox="215 85 370 135" aria-hidden="true"><g fill="none" stroke-linecap="round"><g class="fig"><circle cx="260" cy="100" r="12" stroke="none"/><path d="M238 159 Q240 127 260 127 Q280 127 282 159" stroke-width="10"/><circle cx="330" cy="100" r="12" stroke="none"/><path d="M308 159 Q310 127 330 127 Q350 127 352 159" stroke-width="10"/><circle cx="470" cy="100" r="12" stroke="none"/><path d="M448 159 Q450 127 470 127 Q490 127 492 159" stroke-width="10"/><circle cx="540" cy="100" r="12" stroke="none"/><path d="M518 159 Q520 127 540 127 Q560 127 562 159" stroke-width="10"/></g><g class="acento"><circle cx="400" cy="100" r="12" stroke="none"/><path d="M378 159 Q380 127 400 127 Q420 127 422 159" stroke-width="10"/><path d="M225 178 Q400 212 575 178" stroke-width="8"/></g></g></svg></template>
+<main class="capas" id="vista"></main>
+<div class="modal-fondo" id="modal" hidden>
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="modalTitulo">
+    <header class="modal-cab"><button class="barra-btn" type="button" data-cerrar aria-label="Regresar"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg></button><h2 id="modalTitulo"></h2></header>
+    <div class="modal-cuerpo" id="modalCuerpo"></div>
+    <footer class="modal-pie" id="modalPie"></footer>
+  </div>
+</div>
+<div class="aviso" id="aviso" role="status" hidden></div>
+<div class="estado" id="estado" aria-live="polite"><i></i><span></span></div>
+<div id="impresion" aria-hidden="true"></div>
+
+<script src="js/config.js?v=5"></script>
+<script src="js/nube.js?v=5"></script>
+<script src="js/costeo.js?v=5"></script>
+<script src="js/datos.js?v=5"></script>
+<script src="js/app.js?v=5"></script>
+</body>
+</html>

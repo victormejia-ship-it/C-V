@@ -469,3 +469,29 @@ details summary { cursor: pointer; }
 }
 
 .agregar-cot #q-calc { grid-column: 1 / -1; min-height: 1.2em; }
+
+/* ================================================== Sitio web (administración) */
+.ranuras { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.ranura { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.ranura-img { aspect-ratio: 4 / 3; border-radius: var(--radio-m); overflow: hidden; background: var(--superficie-2); }
+.ranura.vertical .ranura-img { aspect-ratio: 4 / 5; }
+.ranura.vertical { grid-row: span 2; }
+.ranura-img img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.ranura-vacia { width: 100%; height: 100%; display: grid; place-items: center; background: radial-gradient(120% 90% at 85% 10%, rgba(242, 101, 34, .22), transparent 55%), #1F1F1F; }
+.ranura-vacia svg { width: 34%; max-width: 64px; height: auto; aspect-ratio: 1; stroke: var(--naranja); fill: none; stroke-width: 1.3; stroke-linecap: round; stroke-linejoin: round; }
+.ranura-txt { display: flex; flex-direction: column; line-height: 1.35; }
+.ranura-txt b { font-weight: 500; font-size: .88rem; }
+.consejos { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 8px; font-size: .86rem; color: var(--tinta-suave); }
+
+/* ================================================== Solicitudes */
+.solicitudes { display: grid; grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); gap: 14px; }
+@media (max-width: 420px) { .solicitudes { grid-template-columns: minmax(0, 1fr); } }
+.solicitud { background: var(--superficie); border-radius: var(--radio); padding: var(--pad); display: flex; flex-direction: column; gap: 14px; box-shadow: var(--sombra); min-width: 0; }
+.sol-cab { display: flex; justify-content: space-between; align-items: flex-start; gap: 10px; }
+.sol-cab b { font: 600 1rem var(--f-titulo); }
+.sol-datos { display: flex; flex-wrap: wrap; gap: 8px 16px; font-size: .84rem; color: var(--tinta-suave); }
+.sol-datos span { display: inline-flex; align-items: center; gap: 6px; }
+.sol-datos svg { width: 16px; height: 16px; stroke: var(--acento); fill: none; stroke-width: 1.7; stroke-linecap: round; stroke-linejoin: round; }
+.sol-msj { font-size: .88rem; background: var(--superficie-2); border-radius: var(--radio-c); padding: 10px 12px; white-space: pre-line; overflow-wrap: anywhere; }
+.sol-contacto { display: flex; flex-wrap: wrap; gap: 6px; }
+.sol-contacto .btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
