@@ -8,6 +8,20 @@ Es una página estática, sin servidor, en el mismo estilo que Forguard y
 Profectus: se abre `index.html` y funciona. Todo está en español y con la
 marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 
+## Cómo se navega
+
+- **Inicio**: íconos de cada función, un saludo y el resumen del día. La lupa
+  busca en toda la plataforma, el círculo con tu inicial abre tu cuenta y el
+  botón **+** crea un evento, receta, servicio o insumo.
+- Cada función se abre como **pantalla completa** encima del inicio, y dentro
+  de ella cada elemento se abre como otra pantalla encima.
+- **Regresar** (flecha de la barra, botón atrás del navegador o del celular, o
+  Esc) quita solo la pantalla de arriba: la de abajo sigue donde se quedó,
+  con su desplazamiento y lo que tenías escrito. El ícono de cuadritos lleva
+  directo al inicio.
+- Los formularios, listas de compras y confirmaciones también son pantallas
+  completas (o una hoja corta en las confirmaciones) y se cierran igual.
+
 ## Módulos
 
 | Módulo | Para qué sirve |
@@ -22,6 +36,20 @@ marca CIVIZO (Montserrat / Poppins, carbón y naranja).
 | **Producción y compras** | Lista de compras y preparaciones consolidadas de todos los eventos de un periodo, filtrando por estatus y eligiendo eventos. |
 | **Usuarios** | Solo con Firebase: cuentas, roles (Dueño, Administrador, Editor, Consulta) y solicitudes de acceso. |
 | **Ajustes** | Datos de la empresa para los documentos, IVA / margen / food cost / indirectos por omisión, modo claro u oscuro, respaldo y restauración JSON. |
+
+## Precios referenciados
+
+- Cada insumo tiene su **pantalla propia**: precio de costeo, cotizaciones de
+  varias tiendas (Walmart, Soriana, Costco, Central de Abastos…) comparadas
+  por kg / L / pieza, enlace al producto e **historial** con gráfica.
+- **Usar** pasa una cotización al costeo. Ningún precio externo cambia el
+  costo sin que alguien lo confirme.
+- **Actualizar precios** (desde Insumos) lista primero lo que no se ha revisado
+  en los días de vigencia (30 por omisión, en Ajustes): escribes el precio,
+  Enter guarda y pasa al siguiente; Enter vacío confirma el precio actual.
+- **Importar factura**: lee el XML (CFDI 3.3 / 4.0) de cualquier proveedor,
+  sugiere el insumo de cada concepto, calcula el precio con descuentos e
+  impuestos y recuerda la relación para la siguiente factura.
 
 ## Cómo se calcula
 
