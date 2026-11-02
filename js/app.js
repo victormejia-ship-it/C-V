@@ -94,6 +94,7 @@
     escalar: '<path d="M4 20L20 4M14 4h6v6M4 14v6h6"/>',
     externo: '<path d="M14 4h6v6M20 4l-9 9"/><path d="M18 14v5a1 1 0 0 1-1 1H5a1 1 0 0 1-1-1V7a1 1 0 0 1 1-1h5"/>',
     check: '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+    cobranza: '<path d="M6 6V5a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/><rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><path d="M15.5 15h2.5"/>',
     web: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.6 3.8 5.6 3.8 9s-1.3 6.4-3.8 9c-2.5-2.6-3.8-5.6-3.8-9S9.5 5.6 12 3z"/>',
     bandeja: '<path d="M3 13l2.5-8h13L21 13v6a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1v-6z"/><path d="M3 13h5l1.5 2.5h5L16 13h5"/>',
     galeria: '<rect x="3" y="4" width="18" height="16" rx="2.5"/><circle cx="9" cy="10" r="1.8"/><path d="M21 16l-5-5-8 9"/>',
@@ -175,7 +176,7 @@
   let pila = [];
   let entradas = 0;
   const limpiar = h => decodeURIComponent(String(h || '').replace(/^#/, ''));
-  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento|insumo)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
+  function rutaDe(h) { h = limpiar(h) || 'inicio'; const m = h.match(/^(receta|servicio|evento|insumo|cobro)-(.+)$/); return m ? { vista: m[1], id: m[2] } : { vista: h, id: null }; }
   const tope = () => pila.length ? pila[pila.length - 1] : 'inicio';
   const urlDe = () => pila.length ? '#' + tope() : location.pathname + location.search;
   function estadoHist() { return { civizo: true, pila: pila.slice(), entradas }; }
@@ -203,10 +204,11 @@
     if (entradas > 0) { history.back(); return; }
     pila.pop(); history.replaceState(estadoHist(), '', urlDe()); pintar('pop');
   }
+  let volverAlInicio = false;
   function irInicio() {
     const extra = modalEntrada ? 1 : 0;
     if (!$('modal').hidden) { ocultarModal(); modalEntrada = false; }
-    if (entradas + extra > 0) history.go(-(entradas + extra));
+    if (entradas + extra > 0) { volverAlInicio = true; history.go(-(entradas + extra)); }
     else { pila = []; history.replaceState(estadoHist(), '', urlDe()); pintar('pop'); }
   }
   window.addEventListener('popstate', ev => {
@@ -216,6 +218,7 @@
     if (st && st.civizo && st.modal) { volviendo = true; history.back(); return; }   // adelante hacia un modal ya cerrado
     if (st && st.civizo) { pila = st.pila.slice(); entradas = st.entradas; }
     else { const h = limpiar(location.hash); pila = h && h !== 'inicio' ? [h] : []; entradas = 0; history.replaceState(estadoHist(), '', urlDe()); }
+    if (volverAlInicio) { volverAlInicio = false; if (pila.length) { pila = []; entradas = 0; history.replaceState(estadoHist(), '', urlDe()); } }   // se entró por enlace directo
     pintar('pop');
     if (volviendo) { volviendo = false; trasVolver.splice(0).forEach(f => f()); }
   });
@@ -265,7 +268,7 @@
     const c = capaActual();
     if (!c || !c.classList.contains('capa')) return pintar('reemplazo');
     const ruta = c.dataset.ruta, r = rutaDe(ruta);
-    const vistas = { sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
+    const vistas = { cobranza: vCobranza, cobro: vCobro, sitio: vSitio, solicitudes: vSolicitudes, tablero: vTablero, insumos: vInsumos, insumo: vInsumo, precios: vPrecios, recetas: vRecetas, receta: vReceta, servicios: vServicios, servicio: vServicio, eventos: vEventos, evento: vEvento, compras: vCompras, ajustes: vAjustes, usuarios: vUsuarios, buscar: vBuscar };
     if (!esAdmin()) { delete vistas.ajustes; delete vistas.usuarios; delete vistas.sitio; }
     if (!NUBE) delete vistas.usuarios;
     ctx = { obj: null, recalcular: null, acciones: {} };
@@ -441,6 +444,7 @@
         if (fc > obj) alertas.push(['alerta', esc(r.nombre) + ': food cost de ' + pct(fc) + ' (objetivo ' + pct(obj) + ')', '#receta-' + r.id, 'Ver']);
       }
     });
+    db.eventos.filter(e => enCobranza(e) && e.estatus !== 'cancelada').forEach(e => { const k = cobDe(e); if (k.estado === 'vencido') alertas.push(['error', esc(e.nombre || e.folio) + ': ' + dinero(k.vencido) + ' vencido', '#cobro-' + e.id, 'Cobrar']); });
     db.eventos.filter(e => e.estatus === 'aprobada' && diasHasta(e.fecha) < 0).forEach(e => alertas.push(['info', esc(e.nombre) + ' ya pasó; márcalo como realizado', '#evento-' + e.id, 'Abrir']));
 
     const conteoLinea = id => db.servicios.filter(s => s.linea === id).length;
@@ -1280,6 +1284,7 @@
       agregarGasto: () => { e.gastos.push({ concepto: '', monto: '' }); guardar(); render(); },
       quitar: d => { e[d.lista].splice(+d.i, 1); guardar(); render(); },
       cotizacion: () => imprimir(docCotizacionCliente(e)),
+      irCobro: () => abrir('cobro-' + e.id),
       costoInterno: () => imprimir(docCostoInterno(e)),
       produccion: () => modalCompras('Producción y compras · ' + (e.nombre || e.folio) + ' · ' + n0(e.personas) + ' personas', C.explotarEvento(e, IX), e.nombre || e.folio, e),
       duplicar: () => { const n = copia(e); n.id = 'evt-' + D.uid(); n.folio = D.siguienteFolio(db); n.nombre = (e.nombre || 'Evento') + ' (copia)'; n.estatus = 'borrador'; delete n.ejemplo; n.creado = n.actualizado = D.ahora(); db.eventos.push(n); cambioEstructura(); aviso('Evento duplicado como borrador'); reemplazar('evento-' + n.id); },
@@ -1287,7 +1292,7 @@
     };
 
     return '<div class="cabecera"><div><span class="ceja">Evento · ' + esc(e.folio) + '</span><h1>' + esc(e.nombre || 'Nuevo evento') + '</h1></div>'
-      + '<div class="acciones"><button class="btn primario" data-accion="cotizacion">' + ico('facturacion') + 'Cotización cliente</button><button class="btn" data-accion="costoInterno">' + ico('imprimir') + 'Costo interno</button><button class="btn" data-accion="produccion">' + ico('lista') + 'Producción y compras</button><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro fantasma" data-accion="eliminar" aria-label="Eliminar evento">' + ico('borrar') + '</button></div></div>'
+      + '<div class="acciones"><button class="btn primario" data-accion="cotizacion">' + ico('facturacion') + 'Cotización cliente</button><button class="btn" data-accion="costoInterno">' + ico('imprimir') + 'Costo interno</button><button class="btn" data-accion="produccion">' + ico('lista') + 'Producción y compras</button><button class="btn" data-accion="irCobro">' + ico('cobranza') + 'Cobranza</button><button class="btn" data-accion="duplicar">' + ico('copiar') + 'Duplicar</button><button class="btn peligro fantasma" data-accion="eliminar" aria-label="Eliminar evento">' + ico('borrar') + '</button></div></div>'
       + '<div class="rejilla r-lateral"><div class="rejilla">'
       + '<section class="panel"><h2>Datos del evento</h2><div class="campos">'
       + campoTexto('Nombre del evento', 'nombre', e.nombre, { ancho: true, ph: 'Ej. Boda García–López, Capacitación anual' })
@@ -1323,6 +1328,7 @@
       + (q.descuento > 0 ? '<div class="fila sub"><span>Precio antes de descuento</span><span>' + dinero(q.precioBruto) + '</span></div><div class="fila sub"><span>Descuento (' + pct(e.descuento) + ')</span><span>−' + dinero(q.descuento) + '</span></div>' : '')
       + '<div class="fila"><span>Subtotal</span><span>' + dinero(q.subtotal) + '</span></div><div class="fila sub"><span>IVA (' + pct(e.iva) + ')</span><span>' + dinero(q.iva) + '</span></div>'
       + '<div class="fila total"><span>Total</span><span>' + dinero(q.total) + '</span></div></div>'
+      + ((e.pagos || []).length ? (() => { const k = C.estadoCobranza(e, q.total, hoyISO(), db.parametros); return '<div class="resumen"><div class="fila"><span>Cobrado</span><span>' + dinero(k.pagado) + ' · saldo ' + dinero(Math.max(k.saldo, 0)) + '</span></div></div>'; })() : '')
       + '<div class="resumen"><div class="fila"><span>Utilidad</span><span class="' + (q.utilidad < 0 ? 'pill error' : '') + '">' + dinero(q.utilidad) + ' · ' + pct(q.margenReal) + '</span></div></div>'
       + medidorFoodCost(q.foodCost, db.parametros.foodCost)
       + (q.error ? '<div class="nota alerta"><b>Revisa:</b> ' + esc(q.error) + '</div>' : '');
@@ -1378,6 +1384,7 @@
     const iconos = [
       ico2('eventos', 'eventos', 'Eventos', abiertos.length || '', ' destacado'),
       ico2('solicitudes', 'bandeja', 'Solicitudes', (db.solicitudes || []).filter(x => x.estatus === 'nueva').length || ''),
+      ico2('cobranza', 'cobranza', 'Cobranza', db.eventos.filter(e => enCobranza(e) && e.estatus !== 'cancelada' && cobDe(e).estado === 'vencido').length || ''),
       ico2('servicios', 'servicios', 'Servicios'),
       ico2('recetas', 'recetas', 'Recetas', conError || ''),
       btnIco('abrirEscalador', 'escalar', 'Escalar'),
@@ -1406,7 +1413,7 @@
       + '<h1>' + saludoHora() + (nombre ? ', <b>' + esc(nombre.split(' ')[0]) + '</b>' : '') + '</h1>'
       + '<div class="resumen-dia">' + resumen.map(t => '<span><i></i>' + t + '</span>').join('') + '</div></div>'
       + '<nav class="iconos" aria-label="Funciones">' + iconos.join('') + '</nav>'
-      + '<div class="separador">Próximamente</div><div class="iconos">' + prox('inventario', 'Inventario') + prox('proveedores', 'Proveedores') + prox('facturacion', 'Cobranza') + '</div>'
+      + '<div class="separador">Próximamente</div><div class="iconos">' + prox('inventario', 'Inventario') + prox('proveedores', 'Proveedores') + '</div>'
       + (D.hayEjemplos(db) && puedeEditar() ? '<div class="aviso-ejemplo"><span>Estás usando datos de ejemplo.</span><button class="btn chico" data-accion="quitarEjemplos">Borrarlos</button></div>' : '')
       + '</div>'
       + (puedeEditar() ? '<button type="button" class="fab" data-accion="crear" aria-label="Crear" title="Crear">' + ico('mas') + '</button>' : '');
@@ -1588,7 +1595,7 @@
   }
 
   /* ---------------------------------------------------------- Solo lectura */
-  const ACC_LECTURA = new Set(['filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
+  const ACC_LECTURA = new Set(['filtroCobranza', 'recibo', 'estadoCuenta', 'verEvento', 'filtroSol', 'modoPrecios', 'buscar', 'cuenta', 'ficha', 'ordenProduccion', 'compras', 'escalaAtajo', 'simAtajo', 'cotizacion', 'costoInterno', 'produccion', 'filtrarLinea', 'verLinea', 'escalaRapida', 'abrirEscalador', 'irBusca', 'imprimirCompras', 'csvCompras', 'alternarEvento', 'exportarCSV', 'editarInsumo']);
   const ENTRADAS_LIBRES = /^(fq|fcat|ftipo|fest|escValor|escModo|simPersonas|rapidaReceta|rapidaPorc|buscaGlobal|cDesde|cHasta)$/;
   function aplicarSoloLectura() {
     capaActual().querySelectorAll('input, select, textarea').forEach(el => { if (!ENTRADAS_LIBRES.test(el.id) && !el.hasAttribute('data-libre')) el.disabled = true; });
@@ -1715,6 +1722,147 @@
     });
     if (!N.sesion()) return pantallaAcceso();
     entrarConSesion();
+  }
+
+  /* ================================================================ COBRANZA
+     Plan de pagos (anticipo y saldo con vencimiento), pagos registrados,
+     recibos con importe con letra y estado de cuenta por evento. Los pagos
+     viven dentro de cada evento, así que se sincronizan con él. */
+  const METODOS = ['Transferencia', 'Efectivo', 'Tarjeta', 'Depósito', 'Cheque'];
+  const ESTADO_COB = { pagado: ['Pagado', 'ok'], sobrepago: ['Pago de más', 'info'], vencido: ['Vencido', 'error'], 'por-vencer': ['Por vencer', 'alerta'], 'al-corriente': ['Al corriente', ''], 'sin-importe': ['Sin importe', ''], pendiente: ['Pendiente', ''], 'sin-fecha': ['Sin fecha', ''] };
+  const pillCob = est => { const x = ESTADO_COB[est] || ['—', '']; return '<span class="pill ' + x[1] + '">' + x[0] + '</span>'; };
+  const cobDe = e => C.estadoCobranza(e, C.cotizarEvento(e, IX).total, hoyISO(), db.parametros);
+  const enCobranza = e => ['aprobada', 'realizado'].includes(e.estatus) || (e.pagos || []).length > 0;
+  const barraAvance = c => '<span class="avance" title="' + pct(c.avance * 100) + ' cobrado"><i style="width:' + (c.avance * 100).toFixed(1) + '%"></i></span>';
+  const filtroCob = { modo: '' };
+  function vCobranza() {
+    const evs = db.eventos.filter(enCobranza).map(e => ({ e, c: cobDe(e) }));
+    const activos = evs.filter(x => x.e.estatus !== 'cancelada' || x.c.pagado);
+    const porCobrar = activos.filter(x => x.c.saldo > 0.005 && x.e.estatus !== 'cancelada');
+    const sumar = (l, f) => l.reduce((s, x) => s + f(x), 0);
+    const mes = hoyISO().slice(0, 7);
+    const cobradoMes = db.eventos.reduce((s, e) => s + (e.pagos || []).filter(p => String(p.fecha || '').startsWith(mes)).reduce((a, p) => a + C.num(p.monto), 0), 0);
+    const nVenc = activos.filter(x => x.c.estado === 'vencido').length;
+    if (!filtroCob.modo) filtroCob.modo = nVenc ? 'vencidos' : 'pendientes';
+    const m = filtroCob.modo;
+    const vis = activos.filter(x => m === 'todos' || (m === 'vencidos' ? x.c.estado === 'vencido' : m === 'pagados' ? ['pagado', 'sobrepago'].includes(x.c.estado) : x.c.saldo > 0.005 && x.e.estatus !== 'cancelada'))
+      .sort((a, b) => (b.c.estado === 'vencido') - (a.c.estado === 'vencido') || String((a.c.proximo || {}).vence || a.e.fecha || '9').localeCompare(String((b.c.proximo || {}).vence || b.e.fecha || '9')));
+    const filas = vis.map(({ e, c }) => '<tr class="clic" tabindex="0" data-ir="#cobro-' + e.id + '"><td><b>' + esc(e.nombre || e.folio) + '</b><br><span class="tenue">' + esc(e.cliente || '—') + ' · ' + fechaCorta(e.fecha) + '</span></td>'
+      + '<td class="num">' + dinero(c.total) + '</td><td class="num">' + dinero(c.pagado) + '<br>' + barraAvance(c) + '</td><td class="num"><b>' + dinero(Math.max(c.saldo, 0)) + '</b></td>'
+      + '<td>' + (c.proximo ? esc(c.proximo.concepto) + ' ' + dinero(c.proximo.monto) + '<br><span class="tenue">' + (c.proximo.vence ? 'vence ' + fechaCorta(c.proximo.vence) : 'sin fecha') + '</span>' : '<span class="tenue">—</span>') + '</td><td>' + pillCob(c.estado) + '</td></tr>').join('');
+    const recientes = [];
+    db.eventos.forEach(e => (e.pagos || []).forEach(p => recientes.push({ e, p })));
+    recientes.sort((a, b) => String(b.p.fecha || '').localeCompare(String(a.p.fecha || '')) || String(b.p.registrado || '').localeCompare(String(a.p.registrado || '')));
+    ctx.acciones = { filtroCobranza: d => { filtroCob.modo = d.modo; render(); } };
+    return '<div class="cabecera"><div><span class="ceja">Finanzas</span><h1>Cobranza</h1></div></div>'
+      + '<div class="metricas"><div class="metrica destacada"><span class="et">Por cobrar</span><span class="val">' + dinero(sumar(porCobrar, x => x.c.saldo)) + '</span><span class="det">' + porCobrar.length + ' evento' + (porCobrar.length === 1 ? '' : 's') + ' con saldo</span></div>'
+      + '<div class="metrica"><span class="et">Vencido</span><span class="val" style="color:var(--' + (nVenc ? 'error' : 'tinta') + ')">' + dinero(sumar(activos, x => x.c.vencido)) + '</span><span class="det">' + nVenc + ' evento' + (nVenc === 1 ? '' : 's') + '</span></div>'
+      + '<div class="metrica"><span class="et">Cobrado este mes</span><span class="val">' + dinero(cobradoMes) + '</span><span class="det">' + MESES_L[new Date().getMonth()] + '</span></div>'
+      + '<div class="metrica"><span class="et">Por vencer</span><span class="val">' + activos.filter(x => x.c.estado === 'por-vencer').length + '</span><span class="det">en los próximos 3 días</span></div></div>'
+      + '<div class="pestanas">' + [['vencidos', 'Vencidos'], ['pendientes', 'Por cobrar'], ['pagados', 'Pagados'], ['todos', 'Todos']].map(f => '<button class="' + (m === f[0] ? 'activa' : '') + '" data-accion="filtroCobranza" data-modo="' + f[0] + '">' + f[1] + '</button>').join('') + '</div>'
+      + '<div class="rejilla r-lateral"><section class="panel">' + (vis.length ? '<div class="tabla-env"><table><thead><tr><th>Evento</th><th class="num">Total</th><th class="num">Cobrado</th><th class="num">Saldo</th><th>Próximo pago</th><th>Estado</th></tr></thead><tbody>' + filas + '</tbody></table></div>'
+        : '<div class="vacio"><h3>' + (m === 'vencidos' ? 'Nada vencido' : 'Nada en esta lista') + '</h3><p>Los eventos aprobados aparecen aquí con su plan de anticipo y saldo.</p></div>') + '</section>'
+      + '<aside class="pegajoso"><section class="panel"><h2>Pagos recientes</h2>' + (recientes.length ? '<div class="resumen">' + recientes.slice(0, 8).map(x => '<div class="fila"><span>' + esc(x.e.nombre || x.e.folio) + '<br><span class="tenue">' + fechaCorta(x.p.fecha) + ' · ' + esc(x.p.metodo || '') + '</span></span><span>' + dinero(x.p.monto) + '</span></div>').join('') + '</div>' : '<p class="tenue">Aún no hay pagos registrados.</p>') + '</section></aside></div>';
+  }
+
+  function vCobro(id) {
+    const e = db.eventos.find(x => x.id === id);
+    if (!e) return noEncontrado('El evento');
+    e.pagos = e.pagos || []; e.cobro = e.cobro || {}; e.factura = e.factura || {};
+    ctx.obj = e;
+    const c = cobDe(e);
+    const resumen = () => {
+      const k = cobDe(e);
+      return '<div class="cobro-cifras"><div><span class="et">Total del evento</span><b>' + dinero(k.total) + '</b><span class="tenue">con IVA</span></div><div><span class="et">Cobrado</span><b>' + dinero(k.pagado) + '</b>' + barraAvance(k) + '</div><div class="acento"><span class="et">Saldo</span><b>' + dinero(Math.max(k.saldo, 0)) + '</b>' + pillCob(k.estado) + '</div></div>'
+        + '<div class="plan">' + [['Anticipo · ' + pct(k.anticipoPct), k.anticipo], ['Saldo', k.final]].map(([t, x]) => '<div class="plan-paso ' + x.estado + '"><span class="plan-punto"></span><div><b>' + t + '</b><span class="tenue">' + dinero(x.monto) + (x.vence ? ' · vence ' + fechaCorta(x.vence) : ' · sin fecha') + '</span></div>' + pillCob(x.estado) + '</div>').join('') + '</div>'
+        + (k.estado === 'sobrepago' ? '<div class="nota alerta">Se registró ' + dinero(-k.saldo) + ' de más. Revisa los pagos o anota la devolución.</div>' : '');
+    };
+    const filas = c.pagos.map((p, i) => '<tr><td>' + fechaCorta(p.fecha) + '<br><span class="tenue">' + esc(p.folio || '') + '</span></td><td>' + esc(p.metodo || '—') + (p.referencia ? '<br><span class="tenue">' + esc(p.referencia) + '</span>' : '') + '</td><td>' + esc(p.nota || '') + '</td><td class="num"><b>' + dinero(p.monto) + '</b></td>'
+      + '<td class="acc"><button class="icono-btn ir" data-accion="recibo" data-pid="' + p.id + '" aria-label="Imprimir recibo" title="Imprimir recibo">' + ico('imprimir') + '</button><button class="icono-btn" data-accion="quitarPago" data-pid="' + p.id + '" aria-label="Eliminar pago">✕</button></td></tr>').join('');
+    ctx.recalcular = () => { const r = capaActual().querySelector('#resumenCobro'); if (r) r.innerHTML = resumen(); };
+    ctx.acciones = {
+      registrarPago: () => {
+        const k = cobDe(e);
+        const sugerido = k.proximo ? k.proximo.monto : Math.max(k.saldo, 0);
+        abrirModal({
+          titulo: 'Registrar pago', compacto: true,
+          cuerpo: '<div class="campos" style="grid-template-columns:repeat(2,minmax(0,1fr))"><label class="campo"><span>Monto</span><div class="sufijo"><input id="pg-monto" type="text" inputmode="decimal" value="' + C.r2(sugerido).toFixed(2) + '"><i>MXN</i></div></label>'
+            + '<label class="campo"><span>Fecha</span><input id="pg-fecha" type="date" value="' + hoyISO() + '"></label>'
+            + '<label class="campo"><span>Método</span><select id="pg-metodo">' + METODOS.map(x => '<option>' + x + '</option>').join('') + '</select></label>'
+            + '<label class="campo"><span>Referencia</span><input id="pg-ref" type="text" placeholder="Folio, últimos 4 dígitos…" autocomplete="off"></label>'
+            + '<label class="campo ancho"><span>Nota</span><input id="pg-nota" type="text" placeholder="Opcional" autocomplete="off"></label></div>'
+            + '<p class="tenue" id="pg-calc"></p>',
+          alAbrir: m => {
+            const calc = () => { const v = C.num(m.querySelector('#pg-monto').value), r = C.r2(k.saldo - v); m.querySelector('#pg-calc').textContent = v > 0 ? (r > 0.005 ? 'Después de este pago quedan ' + dinero(r) + '.' : r < -0.005 ? 'Es ' + dinero(-r) + ' más que el saldo.' : 'Con este pago queda liquidado.') + ' ' + C.numeroALetras(v) : ''; };
+            m.querySelector('#pg-monto').addEventListener('input', calc); calc();
+          },
+          botones: [{ texto: 'Cancelar', clase: 'fantasma' }, {
+            texto: 'Registrar pago', clase: 'primario', accion: m => {
+              const monto = C.r2(C.num(m.querySelector('#pg-monto').value)), fecha = m.querySelector('#pg-fecha').value || hoyISO();
+              if (!(monto > 0)) { aviso('Escribe el monto', true); return false; }
+              const n = e.pagos.length + 1;
+              e.pagos.push({ id: 'pag-' + D.uid(), folio: 'R-' + String(e.folio || 'CVZ').replace(/^CVZ-/, '') + '-' + String(n).padStart(2, '0'), fecha, monto, metodo: m.querySelector('#pg-metodo').value, referencia: m.querySelector('#pg-ref').value.trim(), nota: m.querySelector('#pg-nota').value.trim(), registrado: D.ahora(), por: (perfil && perfil.correo) || '' });
+              e.actualizado = D.ahora();
+              guardar(true); render();
+              const k2 = cobDe(e);
+              aviso(k2.saldo <= 0.005 ? 'Pago registrado: evento liquidado' : 'Pago registrado · saldo ' + dinero(k2.saldo));
+            }
+          }]
+        });
+      },
+      quitarPago: d => { const p = e.pagos.find(x => x.id === d.pid); if (!p) return; confirmar('Eliminar pago', '¿Eliminar el pago de <b>' + dinero(p.monto) + '</b> del ' + fechaCorta(p.fecha) + '?', 'Eliminar', () => { e.pagos = e.pagos.filter(x => x.id !== d.pid); e.actualizado = D.ahora(); guardar(true); render(); aviso('Pago eliminado'); }); },
+      recibo: d => { const p = e.pagos.find(x => x.id === d.pid); if (p) imprimir(docRecibo(e, p)); },
+      estadoCuenta: () => imprimir(docEstadoCuenta(e)),
+      verEvento: () => abrir('evento-' + e.id)
+    };
+    const p = db.parametros;
+    return '<div class="cabecera"><div><span class="ceja">Cobranza · ' + esc(e.folio) + '</span><h1>' + esc(e.nombre || 'Evento') + '</h1></div>'
+      + '<div class="acciones"><button class="btn primario" data-accion="registrarPago">' + ico('mas') + 'Registrar pago</button><button class="btn" data-accion="estadoCuenta">' + ico('imprimir') + 'Estado de cuenta</button><button class="btn" data-accion="verEvento">' + ico('eventos') + 'Ver evento</button></div></div>'
+      + '<div class="rejilla r-lateral"><div class="rejilla">'
+      + '<section class="panel"><div class="panel-cab"><div><h2>' + esc(e.cliente || 'Cliente sin nombre') + '</h2><p>' + fechaCorta(e.fecha) + ' · ' + n0(e.personas) + ' personas · ' + pillEstatus(e.estatus) + '</p></div></div><div id="resumenCobro">' + resumen() + '</div></section>'
+      + '<section class="panel"><div class="panel-cab"><h2>Pagos</h2></div>' + (filas ? '<div class="tabla-env"><table><thead><tr><th>Fecha</th><th>Método</th><th>Nota</th><th class="num">Monto</th><th></th></tr></thead><tbody>' + filas + '</tbody><tfoot><tr><td colspan="3">Total cobrado</td><td class="num">' + dinero(c.pagado) + '</td><td></td></tr></tfoot></table></div>' : '<div class="vacio"><p>Aún no hay pagos. Registra el anticipo cuando el cliente confirme.</p><button class="btn primario" data-accion="registrarPago">' + ico('mas') + 'Registrar pago</button></div>') + '</section>'
+      + '</div><aside class="pegajoso rejilla">'
+      + '<section class="panel"><h2>Plan de pagos</h2><div class="campos" style="grid-template-columns:minmax(0,1fr)">'
+      + campoTexto('Anticipo', 'anticipoPct', e.cobro.anticipoPct, { grupo: 'cobro', num: true, suf: '%', ph: String(p.anticipoPct ?? 50) })
+      + campoTexto('Vence el anticipo', 'venceAnticipo', e.cobro.venceAnticipo || c.anticipo.vence, { grupo: 'cobro', tipo: 'date', ayuda: 'Por omisión, ' + (p.diasAnticipo ?? 15) + ' días antes del evento' })
+      + campoTexto('Vence el saldo', 'venceSaldo', e.cobro.venceSaldo || c.final.vence, { grupo: 'cobro', tipo: 'date', ayuda: 'Por omisión, ' + (p.diasSaldo ?? 3) + ' días antes del evento' })
+      + '</div></section>'
+      + '<section class="panel"><h2>Factura</h2><div class="campos" style="grid-template-columns:minmax(0,1fr)">'
+      + campoTexto('Folio', 'folio', e.factura.folio, { grupo: 'factura', ph: 'A-1234' })
+      + campoTexto('Fecha', 'fecha', e.factura.fecha, { grupo: 'factura', tipo: 'date' })
+      + campoTexto('Folio fiscal (UUID)', 'uuid', e.factura.uuid, { grupo: 'factura', ph: 'Opcional' })
+      + '</div></section></aside></div>';
+  }
+  function conceptoPago(e, p) {
+    const orden = (e.pagos || []).slice().sort((a, b) => String(a.fecha || '').localeCompare(String(b.fecha || '')) || String(a.registrado || '').localeCompare(String(b.registrado || '')));
+    const i = orden.findIndex(x => x.id === p.id);
+    const previos = orden.slice(0, i).reduce((s, x) => s + C.num(x.monto), 0);
+    const total = C.cotizarEvento(e, IX).total;
+    const restante = C.r2(total - previos - C.num(p.monto));
+    return { previos, restante, total, concepto: restante <= 0.005 ? (i === 0 ? 'Pago total' : 'Liquidación') : i === 0 ? 'Anticipo' : 'Abono' };
+  }
+  function docRecibo(e, p) {
+    const k = conceptoPago(e, p);
+    return encabezadoDoc('Recibo de pago', '<div><b>' + esc(p.folio || '') + '</b></div><div>Fecha: ' + fechaCorta(p.fecha) + '</div>')
+      + '<div class="recibo-monto"><span>Recibimos de <b>' + esc(e.cliente || e.contacto || 'Cliente') + '</b> la cantidad de</span><b class="importe">' + dinero(p.monto) + '</b><span>(' + esc(C.numeroALetras(p.monto)) + ')</span></div>'
+      + '<div class="datos"><div><b>Concepto:</b> ' + k.concepto + ' del evento «' + esc(e.nombre || e.folio) + '»</div><div><b>Cotización:</b> ' + esc(e.folio) + '</div>'
+      + '<div><b>Fecha del evento:</b> ' + fechaCorta(e.fecha) + '</div><div><b>Personas:</b> ' + n0(e.personas) + '</div>'
+      + '<div><b>Forma de pago:</b> ' + esc(p.metodo || '—') + '</div><div><b>Referencia:</b> ' + esc(p.referencia || '—') + '</div></div>'
+      + '<div class="totales"><div><span>Total del evento</span><span>' + dinero(k.total) + '</span></div><div><span>Pagos anteriores</span><span>' + dinero(k.previos) + '</span></div><div><span>Este pago</span><span>' + dinero(p.monto) + '</span></div><div class="gran"><span>Saldo pendiente</span><span>' + dinero(Math.max(k.restante, 0)) + '</span></div></div>'
+      + (p.nota ? '<p style="margin-top:10px"><b>Nota:</b> ' + esc(p.nota) + '</p>' : '')
+      + '<div class="firmas"><div>Recibió · ' + esc(db.empresa.responsable || db.empresa.nombre) + '</div><div>Entregó · ' + esc(e.contacto || e.cliente || 'Cliente') + '</div></div>' + pieDoc();
+  }
+  function docEstadoCuenta(e) {
+    const k = cobDe(e);
+    let acum = 0;
+    return encabezadoDoc('Estado de cuenta', '<div><b>' + esc(e.folio) + '</b></div><div>Al ' + fechaCorta(hoyISO()) + '</div>')
+      + datosEventoDoc(e)
+      + '<h2>Plan de pagos</h2><table><thead><tr><th>Concepto</th><th>Vence</th><th class="num">Monto</th><th>Estado</th></tr></thead><tbody>'
+      + [['Anticipo (' + pct(k.anticipoPct) + ')', k.anticipo], ['Saldo', k.final]].map(([t, x]) => '<tr><td>' + t + '</td><td>' + fechaCorta(x.vence) + '</td><td class="num">' + dinero(x.monto) + '</td><td>' + (ESTADO_COB[x.estado] || ['—'])[0] + '</td></tr>').join('') + '</tbody></table>'
+      + '<h2>Pagos recibidos</h2>' + (k.pagos.length ? '<table><thead><tr><th>Fecha</th><th>Recibo</th><th>Forma de pago</th><th class="num">Monto</th><th class="num">Saldo</th></tr></thead><tbody>' + k.pagos.map(p => { acum += C.num(p.monto); return '<tr><td>' + fechaCorta(p.fecha) + '</td><td>' + esc(p.folio || '') + '</td><td>' + esc(p.metodo || '') + (p.referencia ? ' · ' + esc(p.referencia) : '') + '</td><td class="num">' + dinero(p.monto) + '</td><td class="num">' + dinero(Math.max(k.total - acum, 0)) + '</td></tr>'; }).join('') + '</tbody></table>' : '<p>Sin pagos registrados.</p>')
+      + '<div class="totales"><div><span>Total del evento</span><span>' + dinero(k.total) + '</span></div><div><span>Pagado</span><span>' + dinero(k.pagado) + '</span></div><div class="gran"><span>Saldo</span><span>' + dinero(Math.max(k.saldo, 0)) + '</span></div></div>'
+      + (e.factura && e.factura.folio ? '<p style="margin-top:10px"><b>Factura:</b> ' + esc(e.factura.folio) + (e.factura.fecha ? ' del ' + fechaCorta(e.factura.fecha) : '') + (e.factura.uuid ? ' · UUID ' + esc(e.factura.uuid) : '') + '</p>' : '')
+      + pieDoc();
   }
 
   /* ================================================================ SITIO WEB (administración)
@@ -1878,7 +2026,7 @@
       + '</div></section>'
       + '<section class="panel"><h2>Valores por omisión</h2><p class="tenue">Se aplican a recetas, servicios y eventos nuevos.</p><div class="campos">'
       + campoTexto('IVA', 'iva', db.parametros.iva, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Margen de utilidad', 'margen', db.parametros.margen, { grupo: 'parametros', num: true, suf: '%' })
-      + campoTexto('Food cost objetivo', 'foodCost', db.parametros.foodCost, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Gastos indirectos', 'indirectos', db.parametros.indirectos, { grupo: 'parametros', num: true, suf: '%', ayuda: 'Renta, luz, administración…' }) + campoTexto('Vigencia de precios', 'diasVigencia', db.parametros.diasVigencia, { grupo: 'parametros', num: true, suf: 'días', ayuda: 'Después de estos días un precio se marca para revisar' })
+      + campoTexto('Food cost objetivo', 'foodCost', db.parametros.foodCost, { grupo: 'parametros', num: true, suf: '%' }) + campoTexto('Gastos indirectos', 'indirectos', db.parametros.indirectos, { grupo: 'parametros', num: true, suf: '%', ayuda: 'Renta, luz, administración…' }) + campoTexto('Anticipo', 'anticipoPct', db.parametros.anticipoPct, { grupo: 'parametros', num: true, suf: '%', ayuda: 'Del total, para confirmar el evento' }) + campoTexto('Vence el anticipo', 'diasAnticipo', db.parametros.diasAnticipo, { grupo: 'parametros', num: true, suf: 'días antes' }) + campoTexto('Vence el saldo', 'diasSaldo', db.parametros.diasSaldo, { grupo: 'parametros', num: true, suf: 'días antes' }) + campoTexto('Vigencia de precios', 'diasVigencia', db.parametros.diasVigencia, { grupo: 'parametros', num: true, suf: 'días', ayuda: 'Después de estos días un precio se marca para revisar' })
       + '</div><label class="campo"><span>Apariencia</span><select id="tema"><option value=""' + (!tema ? ' selected' : '') + '>Igual que el sistema</option><option value="light"' + (tema === 'light' ? ' selected' : '') + '>Clara</option><option value="dark"' + (tema === 'dark' ? ' selected' : '') + '>Oscura</option></select></label></section></div>'
       + '<section class="panel"><h2>Tu información</h2><p class="tenue">' + (NUBE ? 'Se guarda en la nube y todas las cuentas ven lo mismo. Descarga un respaldo de vez en cuando como seguridad.' : 'Todo se guarda en este navegador. Descarga un respaldo con frecuencia y úsalo para pasar la información a otra computadora.') + '</p>'
       + '<div class="acciones"><button class="btn primario" data-accion="respaldo">' + ico('bajar') + 'Descargar respaldo</button><button class="btn" data-accion="restaurar">' + ico('subir') + 'Restaurar respaldo</button>'

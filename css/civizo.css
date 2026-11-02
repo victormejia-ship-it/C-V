@@ -495,3 +495,28 @@ details summary { cursor: pointer; }
 .sol-msj { font-size: .88rem; background: var(--superficie-2); border-radius: var(--radio-c); padding: 10px 12px; white-space: pre-line; overflow-wrap: anywhere; }
 .sol-contacto { display: flex; flex-wrap: wrap; gap: 6px; }
 .sol-contacto .btn { max-width: 100%; overflow: hidden; text-overflow: ellipsis; }
+
+/* ================================================== Cobranza */
+.avance { display: inline-block; width: 90px; max-width: 100%; height: 5px; border-radius: 99px; background: var(--superficie-3); overflow: hidden; vertical-align: middle; }
+.avance i { display: block; height: 100%; background: var(--ok); border-radius: 99px; }
+.cobro-cifras { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.cobro-cifras > div { background: var(--superficie-2); border-radius: var(--radio-m); padding: 14px 16px; display: flex; flex-direction: column; gap: 6px; min-width: 0; align-items: flex-start; }
+.cobro-cifras .et { font-size: .66rem; text-transform: uppercase; letter-spacing: .12em; color: var(--tinta-tenue); }
+.cobro-cifras b { font: 600 1.25rem var(--f-titulo); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.cobro-cifras .acento b { color: var(--acento-tinta); }
+.cobro-cifras .avance { width: 100%; }
+@media (max-width: 560px) { .cobro-cifras { grid-template-columns: minmax(0, 1fr); } }
+.plan { display: flex; flex-direction: column; margin-top: 16px; }
+.plan-paso { display: grid; grid-template-columns: 18px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--linea); }
+.plan-paso:last-child { border-bottom: 0; }
+.plan-paso > div { display: flex; flex-direction: column; }
+.plan-paso b { font-weight: 500; }
+.plan-punto { width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--linea-fuerte); }
+.plan-paso.pagado .plan-punto { background: var(--ok); border-color: var(--ok); }
+.plan-paso.vencido .plan-punto { border-color: var(--error); }
+.plan-paso.por-vencer .plan-punto { border-color: var(--alerta); }
+@media print {
+  .doc .recibo-monto { display: flex; flex-direction: column; align-items: center; gap: 4px; text-align: center; border: 1px solid #ddd; border-radius: 8px; padding: 14px; margin: 6px 0 14px; }
+  .doc .recibo-monto .importe { font: 800 22pt var(--f-titulo); color: #F26522; }
+  .doc .recibo-monto span { font-size: 10pt; }
+}

@@ -57,7 +57,7 @@
     return {
       version: 1,
       empresa: { nombre: 'CIVIZO', lema: 'Servicios Alimentarios', responsable: '', telefono: '', correo: '', ciudad: 'Monterrey, N.L.' },
-      parametros: { iva: 16, margen: 35, foodCost: 30, indirectos: 8, diasVigencia: 30 },
+      parametros: { iva: 16, margen: 35, foodCost: 30, indirectos: 8, diasVigencia: 30, anticipoPct: 50, diasAnticipo: 15, diasSaldo: 3 },
       insumos: [], recetas: [], servicios: [], eventos: [], solicitudes: []
     };
   }
@@ -73,7 +73,7 @@
     out.insumos.forEach(i => { if (!Array.isArray(i.cotizaciones)) i.cotizaciones = []; if (!Array.isArray(i.historial)) i.historial = []; });
     out.recetas.forEach(r => { r.ingredientes = r.ingredientes || []; r.alergenos = r.alergenos || []; });
     out.servicios.forEach(s => { s.componentes = s.componentes || []; });
-    out.eventos.forEach(e => { e.lineas = e.lineas || []; e.personal = e.personal || []; e.gastos = e.gastos || []; });
+    out.eventos.forEach(e => { e.lineas = e.lineas || []; e.personal = e.personal || []; e.gastos = e.gastos || []; e.pagos = Array.isArray(e.pagos) ? e.pagos : []; e.cobro = e.cobro && typeof e.cobro === 'object' ? e.cobro : {}; });
     return out;
   }
 

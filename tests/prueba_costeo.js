@@ -141,4 +141,36 @@ prueba('folios y códigos consecutivos', () => {
   assert.strictEqual(D.siguienteFolio({ eventos: [{ folio: 'CVZ-021126-01' }] }, '2026-11-02'), 'CVZ-021126-02');
 });
 
+prueba('cobranza: plan de anticipo y saldo con vencimientos', () => {
+  const par = { anticipoPct: 50, diasAnticipo: 15, diasSaldo: 3 };
+  const ev = { fecha: '2026-11-30', pagos: [] };
+  let c = C.estadoCobranza(ev, 10000, '2026-11-02', par);
+  assert.strictEqual(c.anticipo.vence, '2026-11-15'); assert.strictEqual(c.final.vence, '2026-11-27');
+  cerca(c.anticipo.monto, 5000); cerca(c.saldo, 10000); assert.strictEqual(c.estado, 'al-corriente');
+  assert.strictEqual(C.estadoCobranza(ev, 10000, '2026-11-13', par).estado, 'por-vencer');
+  c = C.estadoCobranza(ev, 10000, '2026-11-16', par);
+  assert.strictEqual(c.estado, 'vencido'); cerca(c.vencido, 5000);
+  ev.pagos.push({ fecha: '2026-11-10', monto: 5000 });
+  c = C.estadoCobranza(ev, 10000, '2026-11-16', par);
+  assert.strictEqual(c.anticipo.estado, 'pagado'); assert.strictEqual(c.estado, 'al-corriente');
+  assert.strictEqual(c.proximo.concepto, 'Saldo'); cerca(c.proximo.monto, 5000);
+  ev.pagos.push({ fecha: '2026-11-26', monto: 5000 });
+  assert.strictEqual(C.estadoCobranza(ev, 10000, '2026-12-01', par).estado, 'pagado');
+  ev.pagos.push({ fecha: '2026-11-27', monto: 100 });
+  assert.strictEqual(C.estadoCobranza(ev, 10000, '2026-12-01', par).estado, 'sobrepago');
+  const fijo = C.estadoCobranza({ fecha: '2026-11-30', cobro: { anticipoPct: 30, venceAnticipo: '2026-11-05' }, pagos: [] }, 1000, '2026-11-06', par);
+  cerca(fijo.anticipo.monto, 300); assert.strictEqual(fijo.estado, 'vencido');
+});
+
+prueba('importe con letra para recibos', () => {
+  assert.strictEqual(C.numeroALetras(1), 'Un peso 00/100 M.N.');
+  assert.strictEqual(C.numeroALetras(21), 'Veintiún pesos 00/100 M.N.');
+  assert.strictEqual(C.numeroALetras(100), 'Cien pesos 00/100 M.N.');
+  assert.strictEqual(C.numeroALetras(1250.5), 'Mil doscientos cincuenta pesos 50/100 M.N.');
+  assert.strictEqual(C.numeroALetras(31500), 'Treinta y un mil quinientos pesos 00/100 M.N.');
+  assert.strictEqual(C.numeroALetras(57870.23), 'Cincuenta y siete mil ochocientos setenta pesos 23/100 M.N.');
+  assert.strictEqual(C.numeroALetras(1000000), 'Un millón de pesos 00/100 M.N.');
+  assert.strictEqual(C.numeroALetras(2500000), 'Dos millones quinientos mil pesos 00/100 M.N.');
+});
+
 console.log('\n' + ok + ' pruebas correctas');
